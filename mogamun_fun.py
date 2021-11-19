@@ -21,7 +21,7 @@ def get_nodes_scores_of_list_of_genes(
 
 	# calculate nodes scores for the genes with formula: z = inverse CDF(1-p) 
     # if gene has an expression value, and z = -Inf otherwise
-    nodes_scores
+    nodes_scores = []
     for gene in list_of_genes:
     	if gene in de_results["gene"].tolist():
     		de_results_gene = de_results[de_results["gene"] == gene]
@@ -35,3 +35,12 @@ def get_nodes_scores_of_list_of_genes(
     	min_nodes_scores = np.nanmin(nodes_scores[nodes_scores != np.NINF])
     	max_nodes_scores = np.nanmax(nodes_scores[nodes_scores != np.INF])
     	node_score = (node_score - min_nodes_scores) / (max_nodes_scores - min_nodes_scores)
+
+    # replace INF with 1 and replace NINF with 0
+    for node_score in nodes_scores:
+    	if node_score == np.NINF:
+    		node_score = 0
+    	if node_score == np.INF:
+    		node_score = 1
+
+    return nodes_scores
