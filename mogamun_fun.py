@@ -137,7 +137,7 @@ def pick_root(
 	
 	deg = loaded_data["deg"]
 
-	search_space_genes = my_mx.vs["name"]
+	search_space_genes = my_mx[0].vs["name"]
 
 	# get the list of DE genes in the search space
 	deg_avail = deg[deg["gene"].isin(search_space_genes)]
@@ -152,6 +152,130 @@ def pick_root(
 		root = search_space_genes[random.randint(0, len(search_space_genes)-1)]
 
 	return root
+
+
+# Performs a RANDOM depth first search of a given length on a MULTIPLEX network
+def make_dfs(
+		my_mx,
+		root,
+		size_of_individual):
+	
+	# initialization
+	discovered = []
+	result = []
+	current_layer = None
+	stack = [root] # initialize the stack of the pending nodes to visit
+
+	# loop while there are pending elements and the desired size hasn't been met
+	while (len(root) > 0) and (len(result) < size_of_individual):
+		# check if we will change of layer (first loop or 50% chance later)
+		if (not current_layer) or (np.random.uniform(0, 1) <= 0.5):
+			av_layers = []
+			av_layers_ = list(range(1, len(my_mx)+1)) # list all layers
+			if len(av_layers_) > 1:
+				for av_layer_ in av_layers_:
+					if av_layer_ != current_layer:
+						av_layers.append(av_layer_)
+			else:
+				av_layers = av_layers_
+
+			# choose a new layer
+			if len(av_layers) > 0:
+				current_layer = random.choice(av_layers)
+			else:
+				current_layer = current_layer
+
+		node = stack[-1] # take a node from the stack to visit it
+		stack = stack[:-1] # remove node from stack
+
+		if node not in discovered: # verify if the node hasn't been visited
+			discovered.append(node) # add node to the list of visited
+
+			# when finding a disconnected node in a layer, change layer
+			keep_going = True
+			visited_layers = []
+			av_layers = list(range(1, len(my_mx)+1))
+
+			while keep_going:
+				my_neighbors_ = my_mx.vs[my_mx.neighbors(node)]["name"]
+				my_neighbors = []
+				for neighbor in my_neighbors_:
+					if neighbor not in discovered:
+						my_neighbors.append(neighbor)
+
+				if len(my_neighbors) == 0:
+					visited_layers = visited_layers + [current_layer]
+					av_layers_ = av_layers + []
+					av_layers = []
+					for av_layer_ in av_layers_:
+						if av_layer_ not in visited_layers:
+							av_layers.append(av_layer_)
+					if len(av_layers) > 0:
+						current_layer = random.choice(av_layers)
+					else:
+						keep_going = False
+				else:
+					keep_going = False
+
+			my_neighbors = random.shuffle(my_neighbors) # shuffle
+			stack = stack + my_neighbors # add shuffled neighbors to stack
+			result = result + [node] # add node to the individual
+
+	return result
+
+
+# Gets the list of IDs of a set of nodes
+def get_id_of_nodes(
+		list_of_nodes,
+		global_network):
+	
+	nodes = global_network.vs["name"]
+	nodes_ids = []
+	for node in list_of_nodes:
+		nodes_ids.append(nodes.index(node))
+
+	return nodes_ids
+
+
+# Performs a RANDOM depth first search of a given length on a MULTIPLEX network
+def dfs_iterative_mx(
+		my_mx,
+		root,
+		size_of_individual,
+		loaded_data):
+
+	max_number_of_attempts = loaded_data["max_number_of_attemps"]
+	multiplex = loaded_data["multiplex"]
+	keep_looking = True # flag to control the execution of the current function
+	attempts = 0
+
+	while keep_looking:
+		# make depth first search on MyMx using Root as seed
+		result = make_dfs(my_mx, root, size_of_individual)
+
+		# security check of invidual's size
+		if len(result) != size_of_individual:
+			if attempts > max_number_of_attempts: # if max attemps reached
+				my_mx = multiplex # use the big original multiplex
+				root = pick_root(my_mx, loaded_data) # pick a random root
+			else: # if we still have attempts left
+				attempts = attempts + 1 # increment number of attemps
+				root = pick_root(my_mx, loaded_data) # pick a root
+		else: # if a good root was found and the ind has the desired size
+			keep_looking = False # deactivate flag to stop the search
+
+	##### the following conversion has to be done because when a subnetwork is 
+	##### created, the nodes get new IDs, according to the size of the new 
+	##### subnetwork, but the individuals should always have IDs with respect 
+	##### to the global network, therefore the IDs need to be "re-calculated"
+
+	nodes = [] # get local nodes' names
+	for res in result:
+		nodes.append(my_mx[0].vs["name"][res])
+
+	nodes_ids = get_id_of_nodes(nodes, multiplex[0]) # get IDs
+
+	return nodes_ids
 
 
 # Generate the initial population
@@ -169,10 +293,27 @@ def generate_initial_pop(
 
 		root = pick_root(multiplex, loaded_data)
 
+		# use DFS (Depth First Search) from the chosen root
+		# NOTE. DFS will be used in the initial population because it allows 
+		#       to go further from the root
 
-#
-def evaluate_population():
-	pass
+		# makes a random DFS, i.e., the branches are shuffled before
+		# visiting them, in order to generate different individuals each time
+		dfs = dfs_iterative_mx(multiplex, root, size_of_individual, loaded_data)
+
+		# add individual to the population
+		my_population[i] = dfs
+
+	return my_population
+
+
+# Evaluates a whole population
+def evaluate_population(
+		my_population,
+		multiplex,
+		loaded_data):
+
+	fitness_data = #TODO 
 
 
 # Defines the function of the body of MOGAMUN
