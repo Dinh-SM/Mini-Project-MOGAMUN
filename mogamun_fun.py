@@ -44,3 +44,42 @@ def get_nodes_scores_of_list_of_genes(
     		node_score = 1
 
     return nodes_scores
+
+
+# Generates the multiplex network
+def generate_multiplex_network(files):
+	multiplex = []
+
+	all_nodes_to_take = get_list_of_all_nodes_present_in_layers(files)
+
+	for layer_file in files:
+		layer = pd.read_csv(layer_file, sep = '\t')
+
+		current_network = Graph(directed = False)
+		for node in all_nodes_to_take:
+			current_network.add_vertex(str(node))
+		for index, row in layer.iterrows():
+			current_network.add_edge(str(row[0]), str(row[1])) 
+		current_network.vs["label"] = current_network.vs["name"]
+
+		multiplex[[len(multiplex)]] = current_network
+
+	return multiplex
+
+
+# Gets the sorted list of nodes
+def get_list_of_all_nodes_present_in_layers(files):
+	all_nodes = []
+
+	for layer_file in files:
+		layer = pd.read_csv(layer_file, sep = '\t')
+
+		all_nodes = all_nodes + list(set(pd.concat([layer.iloc[:,0], layer.iloc[:,1]], join = "outer")))
+
+	# remove duplicates and sort alphabetically
+	all_nodes = sorted(list(set(all_nodes)))
+
+	# cast to string
+	all_nodes = [str(i) for i in all_nodes]
+
+	return all_nodes

@@ -4,6 +4,7 @@ import os.path
 import moganum_fun
 import numpy as np
 import pandas as pd
+from igraph import *
 from scipy.stats import norm
 
 # Initialize evolution parameters
@@ -66,8 +67,14 @@ def moganum_load_data(
 	else:
 		# if no nodes scores file exists
         # calculate the nodes scores for all the genes in DE analysis results
-		if not os.path.exists(NodesScoresPath):
+		if not os.path.exists(nodes_scores_path):
 			nodes_scores = get_nodes_scores_of_list_of_genes(de_results, list_of_genes,	measure)
 
 			# data frame of genes and scores. NOTE. Genes not in the list have 0
 			genes_with_nodes_scores = pd.DataFrame(list(zip(de_results["gene"], nodes_scores)), columns = ["gene", "nodescore"], dtype = {"gene" : str, "nodescore" : np.float64}).fillna(0)
+
+			genes_with_nodes_scores.to_csv(nodes_scores_path, index = False)
+		else:
+			genes_with_nodes_scores = pd.read_csv(nodes_scores_path, dtype = {"gene" : str, "nodescore" : np.float64})
+
+		multiplex = generate_multiplex_network(files) # make multiplex network
