@@ -62,7 +62,7 @@ def generate_multiplex_network(files):
 			current_network.add_edge(str(row[0]), str(row[1])) 
 		current_network.vs["label"] = current_network.vs["name"]
 
-		multiplex[[len(multiplex)]] = current_network
+		multiplex.append([current_network])
 
 	return multiplex
 
