@@ -1,14 +1,18 @@
 # Imports
+import os
 import glob
+import random
 import os.path
-import moganum_fun
+import mogamun_fun
 import numpy as np
 import pandas as pd
 from igraph import *
+import multiprocessing as mp
 from scipy.stats import norm
+from datetime import datetime
 
 # Initialize evolution parameters
-def moganum_init(
+def mogamun_init(
 		generations = 500,
 		pop_size = 100,
 		min_size = 15,
@@ -39,21 +43,21 @@ def moganum_init(
 
 
 # Load the data to process
-def moganum_load_data(
+def mogamun_load_data(
 		evolution_parameters,
 		differential_expression_path,
 		nodes_scores_path,
 		network_layers_dir,
 		layers):
 
-	measure = evolution_parameters["measure"]
-	threshold_deg = evolution_parameters["threshold_deg"]
+	measure = evolution_parameters["measure"] # "FDR" or "PValue"
+	threshold_deg = evolution_parameters["threshold_deg"] # threshold for DEG
 
 	# columns : {gene, logFC, logCPM, PValue, FDR}
-	de_results = pd.read_csv(differential_expression_path, dtype = {"gene" : str, "logFC" : np.float64, "logCPM" : np.float64, "PValue": np.float64, "FDR" : np.float64})
-	de_results = remove_duplicates_de_results(de_results)
+	de_results = pd.read_csv(differential_expression_path, dtype = {"gene" : str, "logFC" : np.float64, "logCPM" : np.float64, "PValue": np.float64, "FDR" : np.float64}) # load DE
+	de_results = remove_duplicates_de_results(de_results) # remove dup entries
 
-	deg = de_results[de_results["FDR"] < threshold_deg]
+	deg = de_results[de_results["FDR"] < threshold_deg] # get list of DEG
 
 	# verify existence of log(fold change) and consider it for the DEG
 	if "logFC" in deg.columns:
@@ -84,18 +88,51 @@ def moganum_load_data(
 		for layer in multiplex:
 			density_per_layer_multiplex.append(layer.density(loops = False))
 
-		loaded_data = [
-						evolution_parameters,
-						{
-							"network_layers_dir" : network_layers_dir,
-							"layers" : layers,
-							"de_results" : de_results,
-							"deg" : deg,
-							"genes_with_nodes_scores" : genes_with_nodes_scores,
-							"multiplex" : multiplex,
-							"density_per_layer_multiplex" : density_per_layer_multiplex,
-							"merged" : merged
-						}
-					]
+		loaded_data = evolution_parameters
+		loaded_data["network_layers_dir"] = network_layers_dir
+		loaded_data["layers"] = layers
+		loaded_data["de_results"] = de_results
+		loaded_data["deg"] = deg
+		loaded_data["genes_with_nodes_scores"] = genes_with_nodes_scores
+		loaded_data["multiplex"] = multiplex
+		loaded_data["density_per_layer_multiplex"] = density_per_layer_multiplex
+		loaded_data["merged"] = merged
 
 		return loaded_data
+
+
+# Run the algorithm with the specified values for the evolution parameters
+def mogamun_run(
+		loaded_data,
+		cores = 1,
+		number_of_runs_to_execute = 1,
+		results_dir = '.'):
+	
+	if loaded_data:
+		results_path = results_dir + "/Experiment_" + datetime.today().strftime('%Y-%m-%d') + '/'
+		os.mkdir(results_path) # create result folder
+		best_inds_path = results_path + "MOGAMUN_Results_" # path for res
+
+		# init with number of cores
+		pool = mp.Pool(cores)
+
+		runs = list(range(1,number_of_runs_to_execute+1))
+
+		# run mogamun_body in parallel
+		results = [pool.apply(mogamun_body, args = (i, loaded_data, best_inds_path)) for i in runs]
+
+		# close pool
+		pool.close()
+
+	else:
+		print("Missing parameter: loaded_data")
+
+
+# Postprocess the results
+def mogamun_postprocess(
+		experiment_dir = '.',
+		loaded_data,
+    	jaccard_similarity_threshold = 70,
+    	visualize_in_cytoscape = True):
+	
+	postprocess_results(experiment_dir, loaded_data, jaccard_similarity_threshold, visualize_in_cytoscape)
