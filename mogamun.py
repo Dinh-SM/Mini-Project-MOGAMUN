@@ -78,3 +78,24 @@ def moganum_load_data(
 			genes_with_nodes_scores = pd.read_csv(nodes_scores_path, dtype = {"gene" : str, "nodescore" : np.float64})
 
 		multiplex = generate_multiplex_network(files) # make multiplex network
+		merged = generate_merged_network(files) # make the merged network
+		
+		density_per_layer_multiplex = []
+		for layer in multiplex:
+			density_per_layer_multiplex.append(layer.density(loops = False))
+
+		loaded_data = [
+						evolution_parameters,
+						{
+							"network_layers_dir" : network_layers_dir,
+							"layers" : layers,
+							"de_results" : de_results,
+							"deg" : deg,
+							"genes_with_nodes_scores" : genes_with_nodes_scores,
+							"multiplex" : multiplex,
+							"density_per_layer_multiplex" : density_per_layer_multiplex,
+							"merged" : merged
+						}
+					]
+
+		return loaded_data

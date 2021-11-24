@@ -62,7 +62,7 @@ def generate_multiplex_network(files):
 			current_network.add_edge(str(row[0]), str(row[1])) 
 		current_network.vs["label"] = current_network.vs["name"]
 
-		multiplex.append([current_network])
+		multiplex.append(current_network)
 
 	return multiplex
 
@@ -83,3 +83,28 @@ def get_list_of_all_nodes_present_in_layers(files):
 	all_nodes = [str(i) for i in all_nodes]
 
 	return all_nodes
+
+
+# Generates the merged network
+def generate_merged_network(files):
+	V1 = []
+	V2 = []
+	Layer = []
+
+	for layer_file in files:
+		layer = pd.read_csv(layer_file, sep = '\t')
+
+		V1 = V1 + list(layer.iloc[:,0])
+		V2 = V2 + list(layer.iloc[:,1])
+		Layer = Layer + [layer_file]*len(list(layer.iloc[:,0]))
+
+	merged = pd.DataFrame(list(zip(V1, V2, Layer)), columns = ["V1", "V2", "Layer"], dtype = {"V1" : str, "V2" : str, "Layer" : str})
+
+	merged_network = Graph(directed = False)
+	for index, row in merged.iterrows():
+		merged_network.add_vertex(str(row[0]))
+		merged_network.add_vertex(str(row[1]))
+		merged_network.add_edge(str(row[0]), str(row[1]))
+	merged_network.vs["label"] = merged_network.vs["name"]
+
+	return merged_network
