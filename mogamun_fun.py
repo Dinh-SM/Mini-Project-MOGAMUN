@@ -218,7 +218,7 @@ def make_dfs(
 				else:
 					keep_going = False
 
-			my_neighbors = random.shuffle(my_neighbors) # shuffle
+			random.shuffle(my_neighbors) # shuffle
 			stack = stack + my_neighbors # add shuffled neighbors to stack
 			result = result + [node] # add node to the individual
 
@@ -335,7 +335,7 @@ def evaluate_ind(
 		sum_density_all_layers = 0
 
 		# loop through all the layers in the multiplex
-		for layer in range(multiplex):
+		for layer in range(len(multiplex)):
 			# get the inds subnetwork corresponding in the current layer
 			subnetwork = multiplex[layer].induced_subgraph(individual)
 
@@ -367,7 +367,22 @@ def evaluate_population(
 	for i in range(len(my_population)):
 		fitness_data.append(evaluate_ind(my_population[i], multiplex, loaded_data))
 
+	fitness_data = pd.concat(fitness_data).reset_index(drop = True)
+
 	return fitness_data
+
+
+# 
+def non_dom_sort(
+		population,
+		loaded_data):
+
+	objective_names = loaded_data["objective_names"]
+
+	#sort individuals by non domination
+	ranking = fast_non_dominated_sorting(population[objective_names])
+
+	#TODO
 
 
 # Defines the function of the body of MOGAMUN
@@ -379,4 +394,12 @@ def mogamun_body(
 	best_inds_file = best_inds_path + "_Run_" + run_number + ".txt"
 	my_init_pop = generate_initial_pop(loaded_data["pop_size"], loaded_data["multiplex"], loaded_data)
 	fitness_data = evaluate_population(my_init_pop, loaded_data["multiplex"], loaded_data)
-	population = pd.DataFrame(my_init_pop, columns = ["individual"]) # TODO concat
+	population = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
+
+	for i in range(len(my_init_pop)):
+		df.at[i, "individual"] = my_init_pop[i]
+
+	population = pd.concat([population, fitness_data], axis = 1)
+
+	# obtain ranking and crowding distances
+	population = non_dom_sort(population, loaded_data)

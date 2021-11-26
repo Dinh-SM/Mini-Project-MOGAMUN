@@ -35,6 +35,7 @@ def mogamun_init(
 		"mutation_rate" : mutation_rate,
 		"jaccard_similarity_threshold" : jaccard_similarity_threshold,
 		"tournament_size" : tournament_size,
+		"objective_names" : ["average_nodes_score", "density"],
 		"measure" : measure,
 		"threshold_deg" : threshold_deg,
 		"max_number_of_attemps" : max_number_of_attemps
@@ -118,7 +119,7 @@ def mogamun_run(
 		# init with number of cores
 		pool = mp.Pool(cores)
 
-		runs = list(range(1,number_of_runs_to_execute+1))
+		runs = list(range(1, number_of_runs_to_execute+1))
 
 		# run mogamun_body in parallel
 		results = [pool.apply(mogamun_body, args = (i, loaded_data, best_inds_path)) for i in runs]
