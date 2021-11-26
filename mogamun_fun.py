@@ -117,7 +117,8 @@ def generate_merged_network(
 		Layer = Layer + [layer_file]*len(list(layer.iloc[:,0]))
 
 	# get the data frame containing the lists
-	merged = pd.DataFrame(list(zip(V1, V2, Layer)), columns = ["V1", "V2", "Layer"], dtype = {"V1" : str, "V2" : str, "Layer" : str})
+	merged = pd.DataFrame(list(itertools.zip_longest(V1, V2, Layer)), columns = ["V1", "V2", "Layer"])
+	merged = merged.astype({"V1" : str, "V2" : str, "Layer" : str})
 
 	# create merged network, keeping the same order of the nodes as in the mx
 	merged_network = Graph(directed = False)
@@ -347,9 +348,11 @@ def evaluate_ind(
 			# add the normalized subnetwork's density with respect to the density of the current layer
 			sum_density_all_layers = sum_density_all_layers + (subnetwork_density / density_mx[layer])
 	
-		res = pd.DataFrame([[average_nodes_score, sum_density_all_layers]], columns = ["average_nodes_score", "density"], dtype = {"average_nodes_score" : np.float64, "density" : np.float64})
+		res = pd.DataFrame([[average_nodes_score, sum_density_all_layers]], columns = ["average_nodes_score", "density"])
+		res = res.astype({"average_nodes_score" : np.float64, "density" : np.float64})
 	else:
-		res = pd.DataFrame([[0, 0]], columns = ["average_nodes_score", "density"], dtype = {"average_nodes_score" : np.float64, "density" : np.float64})
+		res = pd.DataFrame([[0, 0]], columns = ["average_nodes_score", "density"])
+		res = res.astype({"average_nodes_score" : np.float64, "density" : np.float64})
 
 	return res
 
@@ -376,3 +379,4 @@ def mogamun_body(
 	best_inds_file = best_inds_path + "_Run_" + run_number + ".txt"
 	my_init_pop = generate_initial_pop(loaded_data["pop_size"], loaded_data["multiplex"], loaded_data)
 	fitness_data = evaluate_population(my_init_pop, loaded_data["multiplex"], loaded_data)
+	population = pd.DataFrame(my_init_pop, columns = ["individual"]) # TODO concat

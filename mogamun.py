@@ -3,6 +3,7 @@ import os
 import glob
 import random
 import os.path
+import itertools
 import mogamun_fun
 import numpy as np
 import pandas as pd
@@ -75,7 +76,8 @@ def mogamun_load_data(
 			nodes_scores = get_nodes_scores_of_list_of_genes(de_results, list_of_genes,	measure)
 
 			# data frame of genes and scores. NOTE. Genes not in the list have 0
-			genes_with_nodes_scores = pd.DataFrame(list(zip(de_results["gene"], nodes_scores)), columns = ["gene", "nodescore"], dtype = {"gene" : str, "nodescore" : np.float64}).fillna(0)
+			genes_with_nodes_scores = pd.DataFrame(list(itertools.zip_longest(de_results["gene"], nodes_scores)), columns = ["gene", "nodescore"]).fillna(0)
+			genes_with_nodes_scores = genes_with_nodes_scores.astype({"gene" : str, "nodescore" : np.float64})
 
 			genes_with_nodes_scores.to_csv(nodes_scores_path, index = False)
 		else:
