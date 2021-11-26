@@ -307,13 +307,64 @@ def generate_initial_pop(
 	return my_population
 
 
+# Evaluate an individual
+def evaluate_ind(
+		individual,
+		multiplex,
+		loaded_data):
+
+	genes_nodes_scores = loaded_data["genes_with_nodes_scores"]
+	density_mx = loaded_data["density_per_layer_multiplex"]
+
+	# verifies that there is at least one node present in the individual
+	if len(individual) > 0:
+
+		# gets nodes of the subnetwork
+		nodes_of_subnetwork = []
+		for i in individual:
+			nodes_of_subnetwork.append(multiplex[0].vs["name"][i])
+
+		# gets the sum of the nodes scores of the subnetwork
+		genes_nodes_scores_in_subnetwork = genes_nodes_scores[genes_nodes_scores["gene"].isin(nodes_of_subnetwork)]
+		genes_nodes_scores_in_subnetwork = list(deg_avail["nodescore"])
+		sum_nodes_scores = sum(genes_nodes_scores_in_subnetwork)
+
+		average_nodes_score = sum_nodes_scores / len(individual)
+
+		sum_density_all_layers = 0
+
+		# loop through all the layers in the multiplex
+		for layer in range(multiplex):
+			# get the inds subnetwork corresponding in the current layer
+			subnetwork = multiplex[layer].induced_subgraph(individual)
+
+			#calculate the density of the subnetwork in the current layer
+			subnetwork_density = subnetwork.density()
+
+			if not subnetwork_density:
+				subnetwork_density = 0
+
+			# add the normalized subnetwork's density with respect to the density of the current layer
+			sum_density_all_layers = sum_density_all_layers + (subnetwork_density / density_mx[layer])
+	
+		res = pd.DataFrame([[average_nodes_score, sum_density_all_layers]], columns = ["average_nodes_score", "density"], dtype = {"average_nodes_score" : np.float64, "density" : np.float64})
+	else:
+		res = pd.DataFrame([[0, 0]], columns = ["average_nodes_score", "density"], dtype = {"average_nodes_score" : np.float64, "density" : np.float64})
+
+	return res
+
+
 # Evaluates a whole population
 def evaluate_population(
 		my_population,
 		multiplex,
 		loaded_data):
 
-	fitness_data = #TODO 
+	fitness_data = []
+	for i in range(len(my_population)):
+		fitness_data.append(evaluate_ind(my_population[i], multiplex, loaded_data))
+
+	return fitness_data
 
 
 # Defines the function of the body of MOGAMUN

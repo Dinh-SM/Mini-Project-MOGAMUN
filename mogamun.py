@@ -86,7 +86,7 @@ def mogamun_load_data(
 		
 		density_per_layer_multiplex = []
 		for layer in multiplex:
-			density_per_layer_multiplex.append(layer.density(loops = False))
+			density_per_layer_multiplex.append(layer.density())
 
 		loaded_data = evolution_parameters
 		loaded_data["network_layers_dir"] = network_layers_dir
