@@ -103,22 +103,22 @@ def generate_merged_network(
 		files):
 
 	# declare empty lists for the edges of the merged
-	V1 = []
-	V2 = []
-	Layer = []
+	v1 = []
+	v2 = []
+	layer = []
 
 	# loop through all the layers to get all the interactions
 	for layer_file in files:
 		# load layer
-		layer = pd.read_csv(layer_file, sep = '\t')
+		layer_ = pd.read_csv(layer_file, sep = '\t')
 
-		V1 = V1 + list(layer.iloc[:,0])
-		V2 = V2 + list(layer.iloc[:,1])
-		Layer = Layer + [layer_file]*len(list(layer.iloc[:,0]))
+		v1 = v1 + list(layer_.iloc[:,0])
+		v2 = v2 + list(layer_.iloc[:,1])
+		layer = layer + [layer_file]*len(list(layer_.iloc[:,0]))
 
 	# get the data frame containing the lists
-	merged = pd.DataFrame(list(itertools.zip_longest(V1, V2, Layer)), columns = ["V1", "V2", "Layer"])
-	merged = merged.astype({"V1" : str, "V2" : str, "Layer" : str})
+	merged = pd.DataFrame(list(itertools.zip_longest(v1, v2, layer)), columns = ["v1", "v2", "Layer"])
+	merged = merged.astype({"v1" : str, "v2" : str, "layer" : str})
 
 	# create merged network, keeping the same order of the nodes as in the mx
 	merged_network = Graph(directed = False)
@@ -429,6 +429,39 @@ def fast_non_dominated_sorting(
 	return rnk_list
 
 
+# Estimates the density of solutions surrounding a particular solution within each front. It calculates the crowding distances of solutions according to their objectives and those within the same front.
+def crowding_dist_4_frnt(
+		population_,
+		ranking,
+		range_):
+
+	pop_size = len(population_)
+	obj_dim = len(range_)
+	var_no = len(population_[0]) - 1 - obj_dim
+	cd = []
+	for i in range(pop_size):
+		cd.append([np.INF]*obj_dim)
+	for i in range(len(ranking)):
+		select_row = []
+		for row in population_:
+			if row[-1] == i+1:
+				select_row.append(row)
+		length = len(ranking[i])
+		if length > 2:
+			for j in range(obj_dim):
+				select_ = []
+				for row in select_row:
+					select_.append(row[var_no+j])
+				select_ = sorted(range(len(select_)), key = lambda k: select_[k])
+				original_idx = []
+				for idx in select_:
+					original_idx.append(ranking[i][idx])
+				for k in range(2:length):
+					cd[original_idx[k-1]][j] = abs(population_[original_idx[k]][var_no+j] - population_[original_idx[k-2]][var_no+j]) / range_[j]
+
+	return cd
+
+
 # Performs the fast non dominated sorting and the calculus of the crowding distance
 def non_dom_sort(
 		population,
@@ -439,16 +472,44 @@ def non_dom_sort(
 	#sort individuals by non domination
 	ranking = fast_non_dominated_sorting(population[objective_names])
 
-	# transform the output of the sorting into a matrix of 2 columns:
+	# transform the output of the sorting into a dataframe of 2 columns:
 	# 1.- Individual ID. 2.- Rank
-	my_result
+	individuals = []
+	ranks = []
+	for i in range(len(ranking)):
+		for ind in ranking[i]:
+			individuals.append(ind)
+			ranks.append(i+1)
 
-	# order the matrix by individual ID
-	my_result
+	my_result = pd.DataFrame(list(itertools.zip_longest(individuals, ranks)), columns = ["individual", "rank"])
+
+	# order the dataframe by individual ID
+	my_result = my_result.sort_values(by = 'individual', ignore_index = True)
 
 	# add the rank to the data frame
-	population["rank"] = my_result
-	#TODO
+	population = population.join(my_result["rank"])
+	
+	# calculate (MAX - MIN) of every objective function
+	range_ = []
+	for objective in objective_names:
+		objective_col = list(population[objective])
+		range_.append(max(objective_col) - min(objective_col))
+
+	# create a dataframe removing the ind codes and the crowding distances
+	pop_col = [col for col in list(population.columns) if col not in ["individual", "crowding_distance"]]
+	pop_ = population[pop_col]
+	population_ = []
+	for i in range(pop_.shape[0]):
+		pop_.append(list(pop_.iloc[i]))
+
+	crowding_distances = crowding_dist_4_frnt(population_, ranking, range_)
+	crowding_distance = []
+	for cd in crowding_distances:
+		crowding_distance.append(sum(cd))
+
+	population["crowding_distance"] = crowding_distance
+
+	return population
 
 
 # Defines the function of the body of MOGAMUN
@@ -469,3 +530,21 @@ def mogamun_body(
 
 	# obtain ranking and crowding distances
 	population = non_dom_sort(population, loaded_data)
+
+	# initilizes the number of generation
+	g <- 1
+	
+	generation = []
+	best_average_nodes_score = []
+	best_density = []
+
+	# TODO stats_gen dataframe
+
+	if_all_rank = True
+	for rank in list(population["rank"]):
+		if rank != 1:
+			if_all_rank = False
+			break
+
+	while g <= loaded_data["generations"] && not if_all_rank:
+		
