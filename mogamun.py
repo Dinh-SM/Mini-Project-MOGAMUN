@@ -72,7 +72,7 @@ def mogamun_load_data(
 		print("Error! One or more networks are missing from " + network_layers_dir)
 	else:
 		# if no nodes scores file exists
-        # calculate the nodes scores for all the genes in DE analysis results
+		# calculate the nodes scores for all the genes in DE analysis results
 		if not os.path.exists(nodes_scores_path):
 			nodes_scores = get_nodes_scores_of_list_of_genes(de_results, list_of_genes,	measure)
 
@@ -135,7 +135,7 @@ def mogamun_run(
 def mogamun_postprocess(
 		experiment_dir = '.',
 		loaded_data,
-    	jaccard_similarity_threshold = 70,
-    	visualize_in_cytoscape = True):
+		jaccard_similarity_threshold = 70,
+		visualize_in_cytoscape = True):
 	
 	postprocess_results(experiment_dir, loaded_data, jaccard_similarity_threshold, visualize_in_cytoscape)

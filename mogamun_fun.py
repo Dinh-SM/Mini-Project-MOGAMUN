@@ -288,7 +288,7 @@ def generate_initial_pop(
 	min_size = loaded_data["min_size"]
 	max_size = loaded_data["max_size"]
 
-	my_population = [0]*pop_size
+	my_population = [[]]*pop_size
 	for i in range(1, pop_size+1):
 		size_of_individual = random.randint(min_size, max_size)
 
@@ -296,7 +296,7 @@ def generate_initial_pop(
 
 		# use DFS (Depth First Search) from the chosen root
 		# NOTE. DFS will be used in the initial population because it allows 
-		#       to go further from the root
+		# to go further from the root
 
 		# makes a random DFS, i.e., the branches are shuffled before
 		# visiting them, in order to generate different individuals each time
@@ -372,7 +372,64 @@ def evaluate_population(
 	return fitness_data
 
 
-# 
+# Performs the fast non dominated sorting 
+def fast_non_dominated_sorting(
+		input_data):
+	
+	pop_size = input_data.shape[0]
+	idx_dominators = [[]]*pop_size
+	idx_dominatees = [[]]*pop_size
+
+	for i in range(pop_size - 1):
+		for j in range(i, pop_size):
+			if i != j:
+				xi = list(input_data.iloc[i,:])
+				xj = list(input_data.iloc[j,:])
+
+				if_all_1 = True
+				if_any_1 = False
+				for i, j in zip(xi, xj):
+					if i < j:
+						if_all_1 = False
+					if i > j:
+						if_any_1 = True
+
+				if_all_2 = True
+				if_any_2 = False
+				for i, j in zip(xi, xj):
+					if j < i:
+						if_all_2 = False
+					if j > i:
+						if_any_2 = True
+
+				if if_all_1 and if_any_1:
+					idx_dominators[j].append(i)
+					idx_dominatees[i].append(j)
+				elif if_all_2 and if_any_2:
+					idx_dominators[i].append(j)
+					idx_dominatees[j].append(i)
+
+	no_dominators = [len(i) for i in idx_dominators]
+	rnk_list = [[i for i, no in enumerate(no_dominators) if no == 0]]
+	sol_assigned = [len([i for i, no in enumerate(no_dominators) if no == 0])]
+	while sum(sol_assigned) < pop_size:
+		q = []
+		no_sol_in_curr_frnt = sol_assigned[-1]
+		for i in range(no_sol_in_curr_frnt):
+			sol_idx = rnk_list[-1][i]
+			his_dominatees = idx_dominatees[sol_idx]
+			for j in his_dominatees:
+				no_dominators[j] = no_dominators[j] - 1
+				if no_dominators[j] == 0:
+					q.append(j)
+
+		rnk_list.append(sorted(q))
+		sol_assigned.append(len(q))
+
+	return rnk_list
+
+
+# Performs the fast non dominated sorting and the calculus of the crowding distance
 def non_dom_sort(
 		population,
 		loaded_data):
@@ -382,6 +439,15 @@ def non_dom_sort(
 	#sort individuals by non domination
 	ranking = fast_non_dominated_sorting(population[objective_names])
 
+	# transform the output of the sorting into a matrix of 2 columns:
+	# 1.- Individual ID. 2.- Rank
+	my_result
+
+	# order the matrix by individual ID
+	my_result
+
+	# add the rank to the data frame
+	population["rank"] = my_result
 	#TODO
 
 
