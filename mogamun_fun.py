@@ -512,6 +512,45 @@ def non_dom_sort(
 	return population
 
 
+# 
+def tournament_selection(
+		tournament_size,
+		tournament_pop):
+
+	# randomly choose as many individuals as the tournament size indicates
+	ids = []
+	while len(ids) != tournament_size:
+		id_ = random.choice(list(range(tournament_pop.shape[0])))
+		if id_ not in ids:
+			ids.append(id_)
+
+	# verify all both individuals are in the same Pareto front
+	if len(list(set(list(tournament_pop["rank"]))))
+	#TODO
+
+
+# Generate a new population from an existing one
+def make_new_population(
+		loaded_data,
+		population):
+
+	pop_size = loaded_data["pop_size"]
+	max_number_of_attempts = loaded_data["max_number_of_attemps"]
+	tournament_size = loaded_data["tournament_size"]
+	multiplex = loaded_data["multiplex"]
+	my_new_population = [[]]*pop_size # initialize vector
+
+	# loop to generate the new population. In each loop, 2 children are created
+	for i in range(0, pop_size, 2):
+		attempts = 0 # counter for max. attemps to find parents
+		keep_looking = True # flag to keep looking for parents
+
+		while attempts < max_number_of_attempts and keep_looking:
+			parent1 = tournament_selection(tournament_size, population) # selection
+			parent2 = get_parent2(parent1, population, loaded_data)
+			#TODO
+
+
 # Defines the function of the body of MOGAMUN
 def mogamun_body(
 		run_number,
@@ -547,4 +586,6 @@ def mogamun_body(
 			break
 
 	while g <= loaded_data["generations"] && not if_all_rank:
-		
+		population = make_new_population(loaded_data, population)
+
+		# add the best values for the two objective functions
