@@ -172,7 +172,7 @@ def make_dfs(
 		# check if we will change of layer (first loop or 50% chance later)
 		if (not current_layer) or (np.random.uniform(0, 1) <= 0.5):
 			av_layers = []
-			av_layers_ = list(range(1, len(my_mx)+1)) # list all layers
+			av_layers_ = list(range(len(my_mx))) # list all layers
 			if len(av_layers_) > 1:
 				for av_layer_ in av_layers_:
 					if av_layer_ != current_layer:
@@ -195,10 +195,10 @@ def make_dfs(
 			# when finding a disconnected node in a layer, change layer
 			keep_going = True
 			visited_layers = []
-			av_layers = list(range(1, len(my_mx)+1))
+			av_layers = list(range(len(my_mx)))
 
 			while keep_going:
-				my_neighbors_ = my_mx.vs[my_mx.neighbors(node)]["name"]
+				my_neighbors_ = my_mx[current_layer].vs[my_mx[current_layer].neighbors(node)]["name"]
 				my_neighbors = []
 				for neighbor in my_neighbors_:
 					if neighbor not in discovered:
@@ -289,7 +289,7 @@ def generate_initial_pop(
 	max_size = loaded_data["max_size"]
 
 	my_population = [[]]*pop_size
-	for i in range(1, pop_size+1):
+	for i in range(pop_size):
 		size_of_individual = random.randint(min_size, max_size)
 
 		root = pick_root(multiplex, loaded_data)
@@ -383,8 +383,8 @@ def fast_non_dominated_sorting(
 	for i in range(pop_size - 1):
 		for j in range(i, pop_size):
 			if i != j:
-				xi = list(input_data.iloc[i,:])
-				xj = list(input_data.iloc[j,:])
+				xi = list(input_data.iloc[i])
+				xj = list(input_data.iloc[j])
 
 				if_all_1 = True
 				if_any_1 = False
@@ -500,7 +500,7 @@ def non_dom_sort(
 	pop_ = population[pop_col]
 	population_ = []
 	for i in range(pop_.shape[0]):
-		pop_.append(list(pop_.iloc[i]))
+		population_.append(list(pop_.iloc[i]))
 
 	crowding_distances = crowding_dist_4_frnt(population_, ranking, range_)
 	crowding_distance = []
@@ -512,7 +512,7 @@ def non_dom_sort(
 	return population
 
 
-# 
+# Performs a tournament selection
 def tournament_selection(
 		tournament_size,
 		tournament_pop):
@@ -525,8 +525,103 @@ def tournament_selection(
 			ids.append(id_)
 
 	# verify all both individuals are in the same Pareto front
-	if len(list(set(list(tournament_pop["rank"]))))
-	#TODO
+	ranks = list(tournament_pop["rank"])
+	ranks_ids = []
+	for id_ in ids:
+		ranks_ids.append(ranks[id_])
+
+	if len(list(set(ranks_ids))) == 1:
+		# verify if these individuals have information about crowding distance
+		# (they won't if generation == 1)
+		if "crowding_distance" in list(tournament_pop.columns):
+			# get id of the individual with the highest crowding distance
+			crowding_distances = list(tournament_pop["crowding_distance"])
+			crowding_distance_ids = []
+			for id_ in ids:
+				crowding_distance_ids.append(crowding_distances[id_])
+			winner = crowding_distances.index(max(crowding_distance_ids))
+		else:
+			# if there is no crowding distance and the individuals have the
+			# same rank, they are all considered as winners
+			winner = list(range(tournament_size))
+	else:
+		# if the individuals are in different Pareto fronts, the winner
+		# of the tournament is the one with lowest value (best ranking)
+		winner = ranks.index(min(ranks_ids))
+
+	tournament_winner = tournament_pop.iloc[[winner]]
+
+	return tournament_winner
+
+
+# Gets the neighbors of a list of nodes, considering all the layers
+def get_neighbors(
+		node_list,
+		multiplex):
+	
+	neighbors = []
+
+	# loop through all the layer of the multiplex
+	for layer in range(len(multiplex)):
+		# add to the list the neighbors of the node list in the current layer
+		for node in node_list:
+			neighbors = neighbors + layer.vs[layer.neighbors(node)]["name"]
+
+	# sort result and delete duplicates
+	neighbors = sorted(list(set(neighbors)))
+
+	return neighbors
+
+
+# Chooses a compatible individual with parent 1
+def get_parent2(
+		parent1,
+		population,
+		loaded_data):
+
+	multiplex = loaded_data["multiplex"]
+	pop_size = loaded_data["pop_size"]
+	tournament_size = loaded_data["tournament_size"]
+
+	### filter population to leave only inds near parent 1
+	# get nodes ids with respect to the big network
+	nodes_ids_of_parent1 = []
+	for ind in list(parent1["individual"]):
+		nodes_ids_of_parent1 = nodes_ids_of_parent1 + ind
+	nodes_ids_of_parent1 = sorted(nodes_ids_of_parent1)
+
+	# get list of nodes IDs in parent 1 and their neighbors
+	neighbors_nodes_p1 = get_neighbors(nodes_ids_of_parent1, multiplex)
+	
+	# get inds that contain at least one node from the previous list
+	neighbors_inds_p1 = []
+	individuals = []
+	for i in range(pop_size):
+		if len([value for value in population.at[i, "individual"] if value in neighbors_nodes_p1]) > 0:
+			neighbors_inds_p1.append(i)
+
+	# filter population and leave individuals near parent 1
+	potential_inds_parent2 = population.iloc[neighbors_inds_p1]
+
+	# verify if parent 1 is in the list and if so, remove it
+	for index, row in potential_inds_parent2.iterrows():
+		for index_, row_ in parent1.iterrows():
+			if row == row_:
+				potential_inds_parent2.drop([index])
+				break
+
+	# if there are more than 2 inds
+	if potential_inds_parent2.shape[0] >= 2:
+		# tournament to choose parent 2
+		parent2 = tournament_selection(tournament_size, potential_inds_parent2)
+	elif potential_inds_parent2.shape[0] == 1:
+		# if there is only 1 ind, keep it
+		parent2 = potential_inds_parent2
+	else:
+		# unsuccessful search for compatible parents
+		parent2 = None
+
+	return parent2
 
 
 # Generate a new population from an existing one
@@ -548,7 +643,16 @@ def make_new_population(
 		while attempts < max_number_of_attempts and keep_looking:
 			parent1 = tournament_selection(tournament_size, population) # selection
 			parent2 = get_parent2(parent1, population, loaded_data)
-			#TODO
+			
+			# verify if the search was unsuccessful
+			if not parent2:
+				# increment no. of attempts
+				attempts = attempts + 1
+			else:
+				# parent 2 found - stop the search
+				keep_looking = False
+
+		# TODO
 
 
 # Defines the function of the body of MOGAMUN
