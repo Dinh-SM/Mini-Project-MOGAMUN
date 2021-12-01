@@ -131,7 +131,7 @@ def generate_merged_network(
 	return merged_network
 
 
-#
+# Picks a random node to be the root of a search. DEG are preferred over non-DEG
 def pick_root(
 		my_mx,
 		loaded_data):
@@ -386,18 +386,18 @@ def fast_non_dominated_sorting(
 
 				if_all_1 = True
 				if_any_1 = False
-				for i, j in zip(xi, xj):
-					if i < j:
+				for k, l in zip(xi, xj):
+					if k < l:
 						if_all_1 = False
-					if i > j:
+					if k > l:
 						if_any_1 = True
 
 				if_all_2 = True
 				if_any_2 = False
-				for i, j in zip(xi, xj):
-					if j < i:
+				for k, l in zip(xi, xj):
+					if l < k:
 						if_all_2 = False
-					if j > i:
+					if l > k:
 						if_any_2 = True
 
 				if if_all_1 and if_any_1:
@@ -835,6 +835,133 @@ def crossover(
 	return children
 
 
+# Mutates a given list of nodes
+def mutate_nodes(
+		individual,
+		ind_to_mut_net,
+		nodes_to_mutate,
+		pot_nodes_to_mutate,
+		loaded_data):
+	
+	# get DEG
+	deg = loaded_data["deg"]
+	ind = []
+
+	# if at least one of the nodes will be mutated
+	# loop through the nodes to remove
+	for i in nodes_to_mutate:
+		mutated_network = ind_to_mut_net.delete_vertices(pot_nodes_to_mutate[i])
+
+		# obtain neighbors of nodes
+		neighbors_or_ind_ = []
+		for node in ind_to_mut_net.vs:
+			neighbors_or_ind_ = neighbors_or_ind_ + loaded_data["merged"].vs[loaded_data["merged"].neighbors(node)]["name"]
+
+		neighbors_mut_ind_ = []
+		for node in mutated_network.vs:
+			neighbors_mut_ind_ = neighbors_mut_ind_ + loaded_data["merged"].vs[loaded_data["merged"].neighbors(node)]["name"]
+
+		# delete nodes that originally belonged to the individual
+		neighbors_or_ind = []
+		for node in neighbors_or_ind_:
+			if node not in ind_to_mut_net.vs["name"]:
+				neighbors_or_ind.append(node)
+
+		neighbors_mut_ind = []
+		for node in neighbors_mut_ind_:
+			if node not in ind_to_mut_net.vs["name"]:
+				neighbors_mut_ind.append(node)
+
+		# check if network is connected and there are available neighbors to add
+		if mutated_network.is_connected() and len(neighbors_mut_ind) >0:
+			# save changes
+			ind = get_id_of_nodes(mutated_network.vs["name"], loaded_data["multiplex"][0])
+			ind_to_mut_net = mutated_network
+			av_neighbors = neighbors_mut_ind
+		else:
+			av_neighbors = neighbors_or_ind
+
+		# if there is at least 1 available neighbor to be added
+		if len(av_neighbors) > 0 and (ind and len(ind) < loaded_data["max_size"]):
+			# pick a node to add
+			new_node_id = get_node_to_add(av_neighbors, loaded_data) # TODO
+
+			# add node to list and to network
+			ind.append(new_node_id)
+			ind_to_mut_net = loaded_data["merged"].induced_subgraph(ind)
+		else:
+			print("Attempt to add a new neighbor FAILED. Rolling back mutation")
+
+	return ind
+
+
+# Performs mutation
+def mutation(
+		individuals,
+		multiplex,
+		loaded_data):
+	
+	merged = loaded_data["merged"]
+	deg = loaded_data["deg"]
+	mutation_rate = loaded_data["mutation_rate"]
+
+	mutants = [[]]*len(individuals)
+
+	# loop through all the individuals to be mutated
+	for i in range(len(individuals)):
+		# generate a random number between 0 and 1
+		p = np.random.uniform(0, 1)
+
+		# check if mutation is to be performed
+		if p <= mutation_rate:
+			# make subnetwork
+			ind_to_mut_net = merged.induced_subgraph(individual[i])
+			# get nodes' degrees
+			ind_to_mut_nodes_ = ind_to_mut_net.vs["name"]
+			ind_to_mut_deg_ = ind_to_mut_net.degree(ind_to_mut_nodes)
+
+			# remove DEG from the list
+			ind_to_mut_nodes = []
+			ind_to_mut_deg = []
+			for j in range(len(ind_to_mut_deg_)):
+				if ind_to_mut_nodes_[j] not in list(deg["gene"]):
+					ind_to_mut_nodes.append(ind_to_mut_nodes_[j])
+					ind_to_mut_deg.append(ind_to_mut_deg_[j])
+
+			# get the list of nodes with the min degree (peripheral nodes) that can be mutated
+			pot_nodes_to_mutate = []
+			for j in range(len(ind_to_mut_nodes)):
+				if ind_to_mut_deg[j] == min(ind_to_mut_deg):
+					pot_nodes_to_mutate.append(ind_to_mut_nodes[j])
+
+			# make vector with the nodes to mutate
+			nodes_to_mutate_ = []
+			for j in range(len(pot_nodes_to_mutate)):
+				if np.random.uniform(0, 1) <= mutation_rate:
+					nodes_to_mutate_.append(1)
+				else:
+					nodes_to_mutate_.append(0)
+
+			# gets the list of chromosomes to be mutated
+			nodes_to_mutate = []
+			for j in range(len(nodes_to_mutate_)):
+				if nodes_to_mutate_[j] == 1:
+					nodes_to_mutate.append(nodes_to_mutate_.index(nodes_to_mutate_[j]))
+
+			# if at least one of the nodes will be mutated
+			if len(nodes_to_mutate) > 0:
+				individuals[i] = mutate_nodes(individuals[i], ind_to_mut_net, nodes_to_mutate, pot_nodes_to_mutate, loaded_data)
+			# if no nodes were removed, add node if max size allows it
+			else:
+				if len(individuals[i]) < loaded_data["max_size"]:
+					individuals[i] = add_node(individuals[i], ind_to_mut_net, loaded_data) # TODO
+
+		# save the individual in the mutants' list
+		mutants[i] = individuals[i]
+
+	return mutants
+
+
 # Generate a new population from an existing one
 def make_new_population(
 		loaded_data,
@@ -874,7 +1001,7 @@ def make_new_population(
 			children = crossover(parent1, parent2, loaded_data)
 		
 		# mutate children
-		children = mutation(children, multiplex, loaded_data) #TODO
+		children = mutation(children, multiplex, loaded_data)
 		# add child 1 to the population
 		my_new_population[i] = children[0]
 		# add child 2 to the population
@@ -935,7 +1062,7 @@ def mogamun_body(
 			if_all_rank = False
 			break
 
-	while g <= loaded_data["generations"] && not if_all_rank:
+	while g <= loaded_data["generations"] and not if_all_rank:
 		population = make_new_population(loaded_data, population)
 
 		# add the best values for the two objective functions
