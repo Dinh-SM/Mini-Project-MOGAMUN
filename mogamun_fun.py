@@ -183,8 +183,6 @@ def make_dfs(
 			# choose a new layer
 			if len(av_layers) > 0:
 				current_layer = random.choice(av_layers)
-			else:
-				current_layer = current_layer
 
 		node = stack[-1] # take a node from the stack to visit it
 		stack = stack[:-1] # remove node from stack
@@ -205,7 +203,7 @@ def make_dfs(
 						my_neighbors.append(neighbor)
 
 				if len(my_neighbors) == 0:
-					visited_layers = visited_layers + [current_layer]
+					visited_layers.append(current_layer)
 					av_layers_ = av_layers + []
 					av_layers = []
 					for av_layer_ in av_layers_:
@@ -220,7 +218,7 @@ def make_dfs(
 
 			random.shuffle(my_neighbors) # shuffle
 			stack = stack + my_neighbors # add shuffled neighbors to stack
-			result = result + [node] # add node to the individual
+			result.append(node) # add node to the individual
 
 	return result
 
@@ -624,6 +622,219 @@ def get_parent2(
 	return parent2
 
 
+# filters the multiplex network, to keep only the specified list of nodes
+def filter_multiplex(
+		multiplex,
+		nodes_to_keep):
+
+	# declare empty list to store the multiplex
+	filtered_multiplex = []
+
+	# loop through all the layers to get the corresponding subnetwork
+	for layer in range(len(multiplex)):
+		# create network with the current layer
+		current_network = multiplex[layer].induced_subgraph(nodes_to_keep)
+
+		# add subnetwork as a layer into the multiplex network
+		filtered_multiplex.append(current_network)
+
+	return filtered_multiplex
+
+
+# perform a RANDOM breadth first search of a given length on a MULTIPLEX network. This means that the branch to be visted is randomnly picked from all the available ones
+def make_bfs(
+		my_mx,
+		root,
+		size_of_individual):
+	
+	# initialization
+	discovered = []
+	result = []
+	current_layer = None
+	# initialize the queue of the pending nodes to visit
+	queue = [root]
+
+	# loop while there are pending elements and the desired size hasn't been met
+	while len(queue) > 0 and len(result) < size_of_individual:
+		# check if we will change of layer
+		if not current_layer or np.random.uniform(0, 1) <= 0.5:
+			av_layers = []
+			av_layers_ = list(range(len(my_mx))) # list all layers
+			if len(av_layers_) > 1:
+				for av_layer_ in av_layers_:
+					if av_layer_ != current_layer:
+						av_layers.append(av_layer_)
+			else:
+				av_layers = av_layers_
+
+			# choose a new layer
+			if len(av_layers) > 0:
+				current_layer = random.choice(av_layers)
+
+		# take a node from the queue to visit it
+		node = queue[0]
+		queue = queue[1:]
+
+		# verify if the node hasn't been visited
+		if node not in discovered:
+			# add node to the list of visited
+			discovered.append(node)
+
+			# when findind a disconnected node in a layer, change layer
+			keep_going = True
+			visited_layers = []
+			av_layers = list(range(len(my_mx)))
+
+			while keep_going:
+				my_neighbors = my_mx[current_layer].vs[my_mx[current_layer].neighbors(node)]["name"]
+				my_neighbors = []
+				for neighbor in my_neighbors_:
+					if neighbor not in discovered:
+						my_neighbors.append(neighbor)
+
+				if len(my_neighbors) == 0:
+					visited_layers.append(current_layer)
+					av_layers_ = av_layers + []
+					av_layers = []
+					for av_layer_ in av_layers_:
+						if av_layer_ not in visited_layers:
+							av_layers.append(av_layer_)
+					if len(av_layers) > 0:
+						current_layer = random.choice(av_layers)
+					else:
+						keep_going = False
+				else:
+					keep_going = False
+
+			random.shuffle(my_neighbors) # shuffle
+			queue = queue + my_neighbors # add shuffled neighbors to queue
+			result.append(node) # add node to the individual
+
+	return my_result
+
+
+# Performs a RANDOM breadth first search of a given length on a MULTIPLEX network. This means that the nodes to be visted are always randomnly picked from all the available ones
+def bfs_iterative_mx(
+		my_mx,
+		root,
+		size_of_individual,
+		loaded_data):
+	
+	max_number_of_attempts = loaded_data["max_number_of_attemps"]
+	multiplex = loaded_data["multiplex"]
+	# flag to control the execution of the current function
+	keep_looking = True
+	attempts = 0
+
+	while keep_looking:
+		result = make_bfs(my_mx, root, size_of_individual)
+
+		# security check of individual's size
+		if len(result) != size_of_individual:
+			# if max attemps reached
+			if attempts > max_number_of_attempts:
+				# use the big original multiplex
+				my_mx = multiplex
+				# pick a random root
+				root = pick_root(my_mx, loaded_data)
+			# if we still have attemps left
+			else:
+				# increment number of attemps
+				attempts = attempts + 1
+				# pick a root
+				root = pick_root(my_mx, loaded_data)
+		# if a good root was found and the ind has the desired size
+		else:
+			# deactivate flag to stop the search
+			keep_looking = False
+
+	##### the following conversion has to be done because when a subnetwork is 
+	##### created, the nodes get new IDs, according to the size of the new 
+	##### subnetwork, but the individuals should always have IDs with respect 
+	##### to the global network, therefore the IDs need to be "re-calculated"
+
+	# get the names of the nodes in the local network with the local IDs
+	nodes = []
+	for res in result:
+		nodes.append(my_mx[0].vs["name"][res])
+
+	# get the global IDs of the corresponding nodes
+	nodes_ids = get_id_of_nodes(nodes, multiplex[0])
+
+	return nodes_ids
+
+
+# Performs crossover
+def crossover(
+		parent1,
+		parent2,
+		loaded_data):
+	
+	max_number_of_attempts = loaded_data["max_number_of_attemps"]
+	min_size = loaded_data["min_size"]
+	max_size = loaded_data["mac_size"]
+	crossover_rate = loaded_data["crossover_rate"]
+	multiplex = loaded_data["multiplex"]
+	# intialize empty list
+	children = []
+	# generate a random number between 0 and 1
+	p = np.random.uniform(0, 1)
+
+	# check if crossover is to be performed
+	if p <= crossover_rate:
+		# join both parents
+		nodes_p = []
+		for ind1 in list(parent1["individual"]):
+			nodes_p = nodes_p + ind1
+		for ind2 in list(parent2["individual"]):
+			for ind2_ in ind2:
+				if ind2_ not in nodes_p:
+					nodes_p.append(ind2_)
+
+		# first, generate the multiplex of the joint parents
+		mx_parents = filter_multiplex(multiplex, nodes_p)
+		
+		# if length is minimum, copy parents
+		if len(nodes_p) == min_size:
+			children = [[], []]
+			for ind1 in list(parent1["individual"]):
+				children[0] = children[0] + ind1
+			for ind2 in list(parent2["individual"])
+				children[1] = children[1] + ind2
+		else:
+			# loop to generate two children
+			for k in range(2):
+				# pick a size for the child
+				if len(nodes_p) >= max_size:
+					size = random.randint(min_size, max_size)
+				else:
+					size = random.randint(min_size, len(nodes_p))
+
+				# pick root
+				root = pick_root(mx_parents, loaded_data)
+				# pick search method
+				search_method = random.choice(["DFS", "BFS"])
+
+				# depth first search
+				if search_method == "DFS":
+					dfs = dfs_iterative_mx(mx_parents, root, size, loaded_data)
+				# breadth first search
+				elif search_method == "BFS":
+					bfs = bfs_iterative_mx(mx_parents, root, size, loaded_data)
+
+					# add child to the population
+					children[k] = bfs
+	# if no crossover was performed, make a copy of the parents
+	else:
+		children = [[], []]
+		for ind1 in list(parent1["individual"]):
+			children[0] = children[0] + ind1
+		for ind2 in list(parent2["individual"])
+			children[1] = children[1] + ind2
+
+	return children
+
+
 # Generate a new population from an existing one
 def make_new_population(
 		loaded_data,
@@ -652,7 +863,42 @@ def make_new_population(
 				# parent 2 found - stop the search
 				keep_looking = False
 
-		# TODO
+		# if unsuccessful search
+		if attempts == max_number_of_attempts:
+			print("Max. no. of attemps to find compatible parents")
+
+			#generate two random individuals
+			children = generate_initial_pop(2, multiplex, loaded_data)
+		else:
+			# mate parents
+			children = crossover(parent1, parent2, loaded_data)
+		
+		# mutate children
+		children = mutation(children, multiplex, loaded_data) #TODO
+		# add child 1 to the population
+		my_new_population[i] = children[0]
+		# add child 2 to the population
+		my_new_population[i+1] = children[1]
+
+	# evaluate offspring
+	fitness_data = evaluate_population(my_new_population, multiplex, loaded_data)
+
+	# generate data frame with the individuals and their fitness
+	new_population = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
+
+	for i in range(len(my_new_population)):
+		new_population.at[i, "individual"] = my_new_population[i]
+
+	new_population = pd.concat([new_population, fitness_data], axis = 1)
+
+	for i in range(len(my_new_population)):
+		new_population.at[i, "rank"] = 0
+		new_population.at[i, "crowding_distance"] = 0
+
+	# prepare new population
+	new_population_for_replacement = replacement(population, new_population, loaded_data) #TODO
+
+	return new_population_for_replacement
 
 
 # Defines the function of the body of MOGAMUN
@@ -667,7 +913,7 @@ def mogamun_body(
 	population = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
 
 	for i in range(len(my_init_pop)):
-		df.at[i, "individual"] = my_init_pop[i]
+		population.at[i, "individual"] = my_init_pop[i]
 
 	population = pd.concat([population, fitness_data], axis = 1)
 
