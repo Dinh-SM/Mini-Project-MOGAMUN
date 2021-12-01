@@ -1,6 +1,6 @@
 # Mini-Project-MOGAMUN
 
-Translation of the MOGAMUN algorithm in Python.
+Translation of the MOGAMUN algorithm in Python as part of a biological networks modeling course.
 
 # Citation
 
