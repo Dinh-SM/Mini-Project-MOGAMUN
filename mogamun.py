@@ -11,6 +11,7 @@ from igraph import *
 import multiprocessing as mp
 from scipy.stats import norm
 from datetime import datetime
+from collections import Counter
 
 # Initialize evolution parameters
 def mogamun_init(

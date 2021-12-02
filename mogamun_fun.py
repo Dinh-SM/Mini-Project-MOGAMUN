@@ -835,6 +835,44 @@ def crossover(
 	return children
 
 
+# Picks a node to add
+def get_node_to_add(
+		av_neighbors,
+		loaded_data):
+
+	deg = loaded_data["deg"]
+	multiplex = loaded_data["multiplex"]
+
+	# get the list of neighbors DEG
+	de_neighbors = []
+	for node in av_neighbors:
+		if node in list(deg["gene"]):
+			de_neighbors.append(node)
+
+	# if there is at least one DE gene in the list of neighbors, keep
+	if len(de_neighbors) > 0:
+		av_neighbors = de_neighbors
+
+	# calculate the number of times each node is neighbor
+	incidences_ = Counter(av_neighbors)
+
+	# get the nodes with highest incidence and keep nodes with a max incidence
+	sorted_counts = incidences_.most_common()
+	av_neighbors = []
+	i = 0
+	while sorted_counts[i][1] == sorted_counts[0][1] and i < len(sorted_counts):
+		av_neighbors.append(sorted_counts[i][0])
+		i += 1
+
+	# pick a random node to add
+	random_node = random.choice(av_neighbors)
+
+	# get ID of the node to add
+	new_node_id = get_id_of_nodes(random_node, multiplex[0])[0]
+
+	return new_node_id
+
+
 # Mutates a given list of nodes
 def mutate_nodes(
 		individual,
@@ -884,13 +922,46 @@ def mutate_nodes(
 		# if there is at least 1 available neighbor to be added
 		if len(av_neighbors) > 0 and (ind and len(ind) < loaded_data["max_size"]):
 			# pick a node to add
-			new_node_id = get_node_to_add(av_neighbors, loaded_data) # TODO
+			new_node_id = get_node_to_add(av_neighbors, loaded_data)
 
 			# add node to list and to network
 			ind.append(new_node_id)
 			ind_to_mut_net = loaded_data["merged"].induced_subgraph(ind)
 		else:
 			print("Attempt to add a new neighbor FAILED. Rolling back mutation")
+
+	return ind
+
+
+# Adds a node to a subnetwork
+def add_node(
+		ind,
+		ind_to_mut_net,
+		loaded_data):
+
+	# get deg
+	deg = loaded_data["deg"]
+
+	# obtain neighbors of nodes
+	av_neighbors_ = []
+	for node in ind_to_mut_net.vs:
+		av_neighbors_ = av_neighbors_ + loaded_data["merged"].vs[loaded_data["merged"].neighbors(node)]["name"]
+
+	# delete from the list all the nodes that originally belonged to the ind
+	av_neighbors = []
+	for node in av_neighbors_:
+		if node not in ind_to_mut_net.vs["name"]:
+			av_neighbors.append(node)
+
+	# if there is at least one available neighbor to be added
+	if len(av_neighbors) > 0:
+		# pick a node
+		new_node_id = get_node_to_add(av_neighbors, loaded_data)
+
+		# add node
+		ind.append(new_node_id)
+	else:
+		print("No nodes to be mutated. Attempt to add a new neighbor FAILED")
 
 	return ind
 
