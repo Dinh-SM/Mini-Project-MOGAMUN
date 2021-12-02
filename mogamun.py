@@ -130,13 +130,3 @@ def mogamun_run(
 
 	else:
 		print("Missing parameter: loaded_data")
-
-
-# Postprocess the results
-def mogamun_postprocess(
-		experiment_dir = '.',
-		loaded_data,
-		jaccard_similarity_threshold = 70,
-		visualize_in_cytoscape = True):
-	
-	postprocess_results(experiment_dir, loaded_data, jaccard_similarity_threshold, visualize_in_cytoscape)

@@ -33,14 +33,14 @@ def get_nodes_scores_of_list_of_genes(
 	# normalizes nodes scores to be in the range [0-1], ignoring +Inf and -Inf
 	for node_score in nodes_scores:
 		min_nodes_scores = np.nanmin(nodes_scores[nodes_scores != np.NINF])
-		max_nodes_scores = np.nanmax(nodes_scores[nodes_scores != np.INF])
+		max_nodes_scores = np.nanmax(nodes_scores[nodes_scores != np.inf])
 		node_score = (node_score - min_nodes_scores) / (max_nodes_scores - min_nodes_scores)
 
 	# replace INF with 1 and replace NINF with 0
 	for node_score in nodes_scores:
 		if node_score == np.NINF:
 			node_score = 0
-		if node_score == np.INF:
+		if node_score == np.inf:
 			node_score = 1
 
 	return nodes_scores
@@ -438,7 +438,7 @@ def crowding_dist_4_frnt(
 	var_no = len(population_[0]) - 1 - obj_dim
 	cd = []
 	for i in range(pop_size):
-		cd.append([np.INF]*obj_dim)
+		cd.append([np.inf]*obj_dim)
 	for i in range(len(ranking)):
 		select_row = []
 		for row in population_:
@@ -595,7 +595,7 @@ def get_parent2(
 	neighbors_inds_p1 = []
 	individuals = []
 	for i in range(pop_size):
-		if len([value for value in population.at[i, "individual"] if value in neighbors_nodes_p1]) > 0:
+		if len(list(set(population.at[i, "individual"]) & set(neighbors_nodes_p1))) > 0:
 			neighbors_inds_p1.append(i)
 
 	# filter population and leave individuals near parent 1
@@ -1025,12 +1025,154 @@ def mutation(
 			# if no nodes were removed, add node if max size allows it
 			else:
 				if len(individuals[i]) < loaded_data["max_size"]:
-					individuals[i] = add_node(individuals[i], ind_to_mut_net, loaded_data) # TODO
+					individuals[i] = add_node(individuals[i], ind_to_mut_net, loaded_data)
 
 		# save the individual in the mutants' list
 		mutants[i] = individuals[i]
 
 	return mutants
+
+
+# 
+def get_duplicated_inds(
+		div_pop,
+		threshold):
+	
+	# create all the combinations of 2 numbers with the ids of individuals
+	index1 = []
+	index2 = []
+	js = []
+	for i in range(len(div_pop)):
+		for j in range(i+1, len(div_pop)):
+			index1.append(i)
+			index2.append(j)
+			
+			ind1 = div_pop.at[i, "individual"] 
+			ind2 = div_pop.at[j, "individual"]
+
+			# calculate the Jaccard similarity index = (intersection of A and B) / (union of A and B)
+			js.append((len(list(set(ind1) & set(ind2))) / len(list(set(ind1) | set(ind2)))) * 100)
+
+	sim = pd.DataFrame(list(itertools.zip_longest(index1, index2, js)), columns = ["index1", "index2", "js"]).fillna(0)
+
+	# keep "duplicated" individuals
+	sim = sim[sim["js"] >= threshold]
+
+	return sim
+
+
+# Replaces all duplicated individuals and those above the permitted threshold of similarity with random individuals
+def replace_duplicated_inds(
+		combined_population,
+		loaded_data):
+	
+	div_pop = combined_population
+	threshold = loaded_data["jaccard_similarity_threshold"]
+	multiplex = loaded_data["multiplex"]
+	# get duplicated individuals
+	sim = get_duplicated_inds(div_pop, threshold)
+
+	# verifiy if there are duplicated individuals
+	if sim.shape[0] > 0:
+		inds_to_remove = []
+
+		# non-dominated sorting and crowding distance calculus
+		sorted_pop = non_dom_sort(div_pop, loaded_data)
+
+		i = 0
+		# loop through all the duplicated individuals
+		while i < sim.shape[0]:
+			# ID of individuals
+			ind1_id = sim.at[i, "index1"]
+			ind2_id = sim.at[i, "index2"]
+
+			if sim.at[i, "js"] < 100 and sorted_pop.at[ind1_id, "rank"] == 1 and sorted_pop.at[ind2_id, "rank"] == 1 and np.isinf(sorted_pop.at[ind1_id, "crowding_distance"]) and np.isinf(sorted_pop.at[ind2_id, "crowding_distance"]):
+				print("Keeping similar individuals. Inf crowding distance.")
+				print(sorted_pop.iloc[[ind1_id, ind2_id]])
+
+			# tournament between the two individuals
+			else:
+				ind_to_keep = tournament_selection(2, sorted_pop.iloc[[ind1_id, ind2_id]])
+				if ind_to_keep == sorted_pop.iloc[[ind1_id]]:
+					inds_to_remove.append(ind2_id)
+				else:
+					inds_to_remove.append(ind1_id)
+
+				# get and remove all future incidences of the ind
+				ref_ = []
+				for ind in inds_to_remove:
+					if ind in list(sim["index1"]) and list(sim["index1"]).index(ind) not in ref_:
+						ref_.append(list(sim["index1"]).index(ind))
+					elif ind in list(sim["index2"]) and list(sim["index2"]).index(ind) not in ref_:
+						ref_.append(list(sim["index2"]).index(ind))
+
+				ref = []
+				for r in ref_:
+					if ref > i:
+						ref.append(r)
+
+				sim = sim.drop(ref)
+
+			i += 1
+
+		# remove the corresponding individuals
+		div_pop = sorted_pop.drop(inds_to_remove)
+
+	# generate as many new individuals as duplicated ones
+	new_inds = generate_initial_pop(combined_population.shape[0] - div_pop.shape[0], multiplex, loaded_data)
+	fitness_data = evaluate_population(new_inds, multiplex, loaded_data)
+
+	div_pop = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
+
+	for i in range(len(new_inds)):
+		div_pop.at[i, "individual"] = new_inds[i]
+
+	div_pop = pd.concat([div_pop, fitness_data], axis = 1)
+
+	for i in range(len(new_inds)):
+		div_pop.at[i, "rank"] = 0
+		div_pop.at[i, "crowding_distance"] = 0
+
+	div_pop = non_dom_sort(div_pop, loaded_data)
+
+	return div_pop
+
+
+# Performs replacement
+def replacement(
+		parents,
+		children,
+		loaded_data):
+	
+	pop_size = loaded_data["pop_size"]
+
+	# combine the new population (offspring) with old population (parents)
+	combined_population = pd.concat([parents, children])
+
+	# replace duplicated individuals with random ones
+	combined_population = replace_duplicated_inds(combined_population, loaded_data)
+
+	# order combined population by rank
+	combined_population = combined_population.sort_values(by = 'rank', ignore_index = True)
+
+	# get last rank which will be in the replacement population
+	last_rank = list(combined_population["rank"])[-1]
+
+	# get last rank individuals
+	last_rank_inds = combined_population[combined_population["rank"] == last_rank]
+
+	# order by crowding distance
+	last_rank_inds = last_rank_inds.sort_values(by = 'crowding_distance', ascending = False, ignore_index = True)
+
+	# select new population for replacement
+	new_population_for_replacement = combined_population[combined_population["rank"] < last_rank]
+
+	i = 0
+	while new_population_for_replacement.shape[0] < pop_size and i < last_rank_inds.shape[0]:
+		new_population_for_replacement.append(last_rank_inds.iloc[[i]], ignore_index = True)
+		i += 1
+
+	return new_population_for_replacement
 
 
 # Generate a new population from an existing one
@@ -1094,9 +1236,30 @@ def make_new_population(
 		new_population.at[i, "crowding_distance"] = 0
 
 	# prepare new population
-	new_population_for_replacement = replacement(population, new_population, loaded_data) #TODO
+	new_population_for_replacement = replacement(population, new_population, loaded_data)
 
 	return new_population_for_replacement
+
+
+# saves in a file the best pop_size individuals of the final population
+def save_final_pop(
+		best_inds_file,
+		population,
+		pop_size,
+		network):
+	
+	# loop through the pop_size best individuals in the population
+	for i in range(len(pop_size)):
+		# get the individual's code
+		ind = population.at[i, "individual"]
+
+		# get the names of the corresponding nodes
+		decoded_ind = network.vs["name"][ind]
+
+		# save in files
+		fd = open(best_inds_file, "a")
+		fd.write(" ".join(decoded_ind) + "," + str(population.at[i, "average_nodes_score"]) + "," + str(population.at[i, "density"]) + "," + str(population.at[i, "rank"]) + "," + str(population.at[i, "crowding_distance"]))
+		fd.close()
 
 
 # Defines the function of the body of MOGAMUN
@@ -1105,7 +1268,7 @@ def mogamun_body(
 		loaded_data,
 		best_inds_path):
 
-	best_inds_file = best_inds_path + "_Run_" + run_number + ".txt"
+	best_inds_file = best_inds_path + "_Run_" + str(run_number) + ".txt"
 	my_init_pop = generate_initial_pop(loaded_data["pop_size"], loaded_data["multiplex"], loaded_data)
 	fitness_data = evaluate_population(my_init_pop, loaded_data["multiplex"], loaded_data)
 	population = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
@@ -1125,15 +1288,31 @@ def mogamun_body(
 	best_average_nodes_score = []
 	best_density = []
 
-	# TODO stats_gen dataframe
-
 	if_all_rank = True
 	for rank in list(population["rank"]):
 		if rank != 1:
 			if_all_rank = False
 			break
 
+	# evolution's loop for g generations or until all inds have rank = 1
 	while g <= loaded_data["generations"] and not if_all_rank:
 		population = make_new_population(loaded_data, population)
 
 		# add the best values for the two objective functions
+		generation.append(g)
+		best_average_nodes_score.append(max(list(population["average_nodes_score"])))
+		best_density.append(max(list(population["density"])))
+
+		print("Run " + str(run_number) + ". Gen. " + str(g) + " completed")
+
+		# increments the generation
+		g += 1
+
+	# saves data in files
+	stats_gen = pd.DataFrame(list(itertools.zip_longest(generation, best_average_nodes_score, best_density)), columns = ["generation", "best_average_nodes_score", "best_density"]).fillna(0)
+
+	stats_gen.to_csv(path_or_buf = best_inds_path + "StatisticsPerGeneration_Run" + str(run_number) + ".csv", index = False)
+
+	save_final_pop(best_inds_file, population, loaded_data["pop_size"], loaded_data["multiplex"][0])
+
+	print("FINISH TIME, RUN " + str(run_number) + ": " + datetime.now().strftime("%H:%M:%S"))
