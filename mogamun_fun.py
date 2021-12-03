@@ -454,7 +454,7 @@ def crowding_dist_4_frnt(
 				original_idx = []
 				for idx in select_:
 					original_idx.append(ranking[i][idx])
-				for k in range(2:length):
+				for k in range(2, length):
 					cd[original_idx[k-1]][j] = abs(population_[original_idx[k]][var_no+j] - population_[original_idx[k-2]][var_no+j]) / range_[j]
 
 	return cd
@@ -799,7 +799,7 @@ def crossover(
 			children = [[], []]
 			for ind1 in list(parent1["individual"]):
 				children[0] = children[0] + ind1
-			for ind2 in list(parent2["individual"])
+			for ind2 in list(parent2["individual"]):
 				children[1] = children[1] + ind2
 		else:
 			# loop to generate two children
@@ -829,7 +829,7 @@ def crossover(
 		children = [[], []]
 		for ind1 in list(parent1["individual"]):
 			children[0] = children[0] + ind1
-		for ind2 in list(parent2["individual"])
+		for ind2 in list(parent2["individual"]):
 			children[1] = children[1] + ind2
 
 	return children
