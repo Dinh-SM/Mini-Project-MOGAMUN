@@ -115,7 +115,8 @@ def mogamun_run(
 	
 	if loaded_data:
 		results_path = results_dir + "/Experiment_" + datetime.today().strftime('%Y-%m-%d') + '/'
-		os.mkdir(results_path) # create result folder
+		if not os.path.exists(results_path):
+			os.mkdir(results_path) # create result folder
 		best_inds_path = results_path + "MOGAMUN_Results_" # path for res
 
 		# init with number of cores

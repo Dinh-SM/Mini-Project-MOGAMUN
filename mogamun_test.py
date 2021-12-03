@@ -34,7 +34,7 @@ except:
 print("DEG, nodes score, layers paths:", deg_path, nodes_scores_path, layers_path, "\n")
 
 
-evolution_parameters = mogamun.mogamun_init(generations = 1, pop_size = 1, min_size = 10, max_size = 20, crossover_rate = 1, mutation_rate = 1, max_number_of_attemps = 1)
+evolution_parameters = mogamun.mogamun_init(generations = 10, pop_size = 10, min_size = 10, max_size = 20, crossover_rate = 1, mutation_rate = 1, max_number_of_attemps = 1)
 
 print("Evolution parameters:", evolution_parameters, "\n")
 

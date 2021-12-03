@@ -131,8 +131,10 @@ def generate_merged_network(
 		layer = layer + [layer_file]*len(list(layer_.iloc[:,0]))
 
 	# get the data frame containing the lists
-	merged = pd.DataFrame(list(itertools.zip_longest(v1, v2, layer)), columns = ["v1", "v2", "Layer"])
-	merged = merged.astype({"v1" : str, "v2" : str, "layer" : str})
+	merged = pd.DataFrame(list(itertools.zip_longest(v1, v2, layer)), columns = ["v1", "v2", "layer"])
+	merged = merged.astype({"v1" : str})
+	merged = merged.astype({"v2" : str})
+	merged = merged.astype({"layer" : str})
 
 	# create merged network, keeping the same order of the nodes as in the mx
 	merged_network = Graph(directed = False)
@@ -282,11 +284,7 @@ def dfs_iterative_mx(
 	##### subnetwork, but the individuals should always have IDs with respect 
 	##### to the global network, therefore the IDs need to be "re-calculated"
 
-	nodes = [] # get local nodes' names
-	for res in result:
-		nodes.append(my_mx[0].vs["name"][res])
-
-	nodes_ids = get_id_of_nodes(nodes, multiplex[0]) # get IDs
+	nodes_ids = get_id_of_nodes(result, multiplex[0]) # get IDs
 
 	return nodes_ids
 
@@ -339,7 +337,7 @@ def evaluate_ind(
 
 		# gets the sum of the nodes scores of the subnetwork
 		genes_nodes_scores_in_subnetwork = genes_nodes_scores[genes_nodes_scores["gene"].isin(nodes_of_subnetwork)]
-		genes_nodes_scores_in_subnetwork = list(deg_avail["nodescore"])
+		genes_nodes_scores_in_subnetwork = list(genes_nodes_scores_in_subnetwork["nodescore"])
 		sum_nodes_scores = sum(genes_nodes_scores_in_subnetwork)
 
 		average_nodes_score = sum_nodes_scores / len(individual)
@@ -762,18 +760,13 @@ def bfs_iterative_mx(
 			# deactivate flag to stop the search
 			keep_looking = False
 
-	##### the following conversion has to be done because when a subnetwork is 
-	##### created, the nodes get new IDs, according to the size of the new 
-	##### subnetwork, but the individuals should always have IDs with respect 
+	##### the following conversion has to be done because when a subnetwork is
+	##### created, the nodes get new IDs, according to the size of the new
+	##### subnetwork, but the individuals should always have IDs with respect
 	##### to the global network, therefore the IDs need to be "re-calculated"
 
-	# get the names of the nodes in the local network with the local IDs
-	nodes = []
-	for res in result:
-		nodes.append(my_mx[0].vs["name"][res])
-
 	# get the global IDs of the corresponding nodes
-	nodes_ids = get_id_of_nodes(nodes, multiplex[0])
+	nodes_ids = get_id_of_nodes(result, multiplex[0])
 
 	return nodes_ids
 
@@ -1263,16 +1256,18 @@ def save_final_pop(
 		network):
 	
 	# loop through the pop_size best individuals in the population
-	for i in range(len(pop_size)):
+	for i in range(pop_size):
 		# get the individual's code
 		ind = population.at[i, "individual"]
 
 		# get the names of the corresponding nodes
-		decoded_ind = network.vs["name"][ind]
+		decoded_ind = []
+		for index in ind:
+			decoded_ind.append(network.vs["name"][index])
 
 		# save in files
 		fd = open(best_inds_file, "a")
-		fd.write(" ".join(decoded_ind) + "," + str(population.at[i, "average_nodes_score"]) + "," + str(population.at[i, "density"]) + "," + str(population.at[i, "rank"]) + "," + str(population.at[i, "crowding_distance"]))
+		fd.write(" ".join(decoded_ind) + "," + str(population.at[i, "average_nodes_score"]) + "," + str(population.at[i, "density"]) + "," + str(population.at[i, "rank"]) + "," + str(population.at[i, "crowding_distance"]) + "\n")
 		fd.close()
 
 
@@ -1296,7 +1291,7 @@ def mogamun_body(
 	population = non_dom_sort(population, loaded_data)
 
 	# initilizes the number of generation
-	g <- 1
+	g = 0
 	
 	generation = []
 	best_average_nodes_score = []
@@ -1317,7 +1312,7 @@ def mogamun_body(
 		best_average_nodes_score.append(max(list(population["average_nodes_score"])))
 		best_density.append(max(list(population["density"])))
 
-		print("Run " + str(run_number) + ". Gen. " + str(g) + " completed")
+		print("Run " + str(run_number) + ". Gen. " + str(g+1) + " completed")
 
 		# increments the generation
 		g += 1
