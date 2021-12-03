@@ -1,10 +1,11 @@
 # Imports
+import mogamun_fun
+
 import os
 import glob
 import random
 import os.path
 import itertools
-import mogamun_fun
 import numpy as np
 import pandas as pd
 from igraph import *
@@ -58,7 +59,7 @@ def mogamun_load_data(
 
 	# columns : {gene, logFC, logCPM, PValue, FDR}
 	de_results = pd.read_csv(differential_expression_path, dtype = {"gene" : str, "logFC" : np.float64, "logCPM" : np.float64, "PValue": np.float64, "FDR" : np.float64}) # load DE
-	de_results = remove_duplicates_de_results(de_results) # remove dup entries
+	de_results = mogamun_fun.remove_duplicates_de_results(de_results) # remove dup entries
 
 	deg = de_results[de_results["FDR"] < threshold_deg] # get list of DEG
 
@@ -67,7 +68,7 @@ def mogamun_load_data(
 		deg = deg[abs(deg["logFC"]) > 1]
 
 	# read the file names of the networks for the current experiment, network_layers_dir needs to finish with '/'
-	files = glob.glob(network_layers_dir + "[" + layers + "]_*")
+	files = glob.glob(network_layers_dir + "/[" + layers + "]_*")
 
 	if len(files) < len(layers):
 		print("Error! One or more networks are missing from " + network_layers_dir)
@@ -75,7 +76,7 @@ def mogamun_load_data(
 		# if no nodes scores file exists
 		# calculate the nodes scores for all the genes in DE analysis results
 		if not os.path.exists(nodes_scores_path):
-			nodes_scores = get_nodes_scores_of_list_of_genes(de_results, list_of_genes,	measure)
+			nodes_scores = mogamun_fun.get_nodes_scores_of_list_of_genes(de_results, list_of_genes,	measure)
 
 			# data frame of genes and scores. NOTE. Genes not in the list have 0
 			genes_with_nodes_scores = pd.DataFrame(list(itertools.zip_longest(de_results["gene"], nodes_scores)), columns = ["gene", "nodescore"]).fillna(0)
@@ -85,8 +86,8 @@ def mogamun_load_data(
 		else:
 			genes_with_nodes_scores = pd.read_csv(nodes_scores_path, dtype = {"gene" : str, "nodescore" : np.float64})
 
-		multiplex = generate_multiplex_network(files) # make multiplex network
-		merged = generate_merged_network(files) # make the merged network
+		multiplex = mogamun_fun.generate_multiplex_network(files) # make multiplex network
+		merged = mogamun_fun.generate_merged_network(files) # make the merged network
 		
 		density_per_layer_multiplex = []
 		for layer in multiplex:
@@ -123,7 +124,7 @@ def mogamun_run(
 		runs = list(range(1, number_of_runs_to_execute+1))
 
 		# run mogamun_body in parallel
-		results = [pool.apply(mogamun_body, args = (i, loaded_data, best_inds_path)) for i in runs]
+		results = [pool.apply(mogamun_fun.mogamun_body, args = (i, loaded_data, best_inds_path)) for i in runs]
 
 		# close pool
 		pool.close()

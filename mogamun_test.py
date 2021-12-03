@@ -1,4 +1,18 @@
+# Imports
 import mogamun
+
+import os
+import glob
+import random
+import os.path
+import itertools
+import numpy as np
+import pandas as pd
+from igraph import *
+import multiprocessing as mp
+from scipy.stats import norm
+from datetime import datetime
+from collections import Counter
 
 print("START\n")
 
@@ -13,7 +27,7 @@ except:
 	nodes_scores_path = None
 
 try:
-	layers_path = os.path.abspath("extdata/DE/LayersMultiplex/")
+	layers_path = os.path.abspath("extdata/LayersMultiplex/")
 except:
 	layers_path = None
 
