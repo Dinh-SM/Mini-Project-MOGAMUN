@@ -16,6 +16,8 @@ from collections import Counter
 def remove_duplicates_de_results(
 		de_results):
 
+	#print("remove_duplicates_de_results")
+
 	# remove NAs
 	de_results = de_results.dropna(subset = ["gene"])
 
@@ -30,6 +32,8 @@ def get_nodes_scores_of_list_of_genes(
 		de_results,
 		list_of_genes,
 		measure):
+
+	#print("get_nodes_scores_of_list_of_genes")
 	
 	list_of_genes = list(set(list_of_genes))
 
@@ -64,6 +68,8 @@ def get_nodes_scores_of_list_of_genes(
 def generate_multiplex_network(
 		files):
 
+	#print("generate_multiplex_network")
+
 	# declare empty list to store the multiplex
 	multiplex = []
 
@@ -93,6 +99,8 @@ def generate_multiplex_network(
 def get_list_of_all_nodes_present_in_layers(
 		files):
 
+	#print("get_list_of_all_nodes_present_in_layers")
+
 	# declare empty variable to store the nodes
 	all_nodes = []
 
@@ -116,6 +124,8 @@ def get_list_of_all_nodes_present_in_layers(
 def generate_merged_network(
 		files):
 
+	#print("generate_merged_network")
+
 	# declare empty lists for the edges of the merged
 	v1 = []
 	v2 = []
@@ -128,7 +138,8 @@ def generate_merged_network(
 
 		v1 = v1 + list(layer_.iloc[:,0])
 		v2 = v2 + list(layer_.iloc[:,1])
-		layer = layer + [layer_file]*len(list(layer_.iloc[:,0]))
+		for lay in range(len(list(layer_.iloc[:,0]))):
+			layer.append([layer_file])
 
 	# get the data frame containing the lists
 	merged = pd.DataFrame(list(itertools.zip_longest(v1, v2, layer)), columns = ["v1", "v2", "layer"])
@@ -139,8 +150,14 @@ def generate_merged_network(
 	# create merged network, keeping the same order of the nodes as in the mx
 	merged_network = Graph(directed = False)
 	for index, row in merged.iterrows():
-		merged_network.add_vertex(str(row[0]))
-		merged_network.add_vertex(str(row[1]))
+		if index > 0:
+			if str(row[0]) not in merged_network.vs["name"]:
+				merged_network.add_vertex(str(row[0]))
+			if str(row[1]) not in merged_network.vs["name"]:
+				merged_network.add_vertex(str(row[1]))
+		else:
+			merged_network.add_vertex(str(row[0]))
+			merged_network.add_vertex(str(row[1]))
 		merged_network.add_edge(str(row[0]), str(row[1]))
 	merged_network.vs["label"] = merged_network.vs["name"]
 
@@ -151,6 +168,8 @@ def generate_merged_network(
 def pick_root(
 		my_mx,
 		loaded_data):
+
+	#print("pick_root")
 	
 	deg = loaded_data["deg"]
 
@@ -176,6 +195,8 @@ def make_dfs(
 		my_mx,
 		root,
 		size_of_individual):
+
+	#print("make_dfs")
 	
 	# initialization
 	discovered = []
@@ -243,9 +264,13 @@ def make_dfs(
 def get_id_of_nodes(
 		list_of_nodes,
 		global_network):
-	
+
+	#print("get_id_of_nodes")
+
 	nodes = global_network.vs["name"]
 	nodes_ids = []
+	if isinstance(list_of_nodes, str):
+		list_of_nodes = [list_of_nodes]
 	for node in list_of_nodes:
 		nodes_ids.append(nodes.index(node))
 
@@ -258,6 +283,8 @@ def dfs_iterative_mx(
 		root,
 		size_of_individual,
 		loaded_data):
+
+	#print("dfs_iterative_mx")
 
 	max_number_of_attempts = loaded_data["max_number_of_attemps"]
 	multiplex = loaded_data["multiplex"]
@@ -295,10 +322,14 @@ def generate_initial_pop(
 		multiplex,
 		loaded_data):
 
+	#print("generate_initial_pop")
+
 	min_size = loaded_data["min_size"]
 	max_size = loaded_data["max_size"]
 
-	my_population = [[]]*pop_size
+	my_population = []
+	for pop in range(pop_size):
+		my_population.append([])
 	for i in range(pop_size):
 		size_of_individual = random.randint(min_size, max_size)
 
@@ -323,6 +354,8 @@ def evaluate_ind(
 		individual,
 		multiplex,
 		loaded_data):
+
+	#print("evaluate_ind")
 
 	genes_nodes_scores = loaded_data["genes_with_nodes_scores"]
 	density_mx = loaded_data["density_per_layer_multiplex"]
@@ -373,24 +406,35 @@ def evaluate_population(
 		multiplex,
 		loaded_data):
 
+	#print("evaluate_population")
+
 	fitness_data = []
 	for i in range(len(my_population)):
 		fitness_data.append(evaluate_ind(my_population[i], multiplex, loaded_data))
 
-	fitness_data = pd.concat(fitness_data).reset_index(drop = True)
+	if fitness_data:
+		fitness_data = pd.concat(fitness_data).reset_index(drop = True)
 
-	return fitness_data
+		return fitness_data
+	else:
+
+		return []
 
 
 # Performs the fast non dominated sorting 
 def fast_non_dominated_sorting(
 		input_data):
+
+	#print("fast_non_dominated_sorting")
 	
 	pop_size = input_data.shape[0]
-	idx_dominators = [[]]*pop_size
-	idx_dominatees = [[]]*pop_size
+	idx_dominators = []
+	idx_dominatees = []
+	for pop in range(pop_size):
+		idx_dominators.append([])
+		idx_dominatees.append([])
 
-	for i in range(pop_size - 1):
+	for i in range(pop_size-1):
 		for j in range(i, pop_size):
 			if i != j:
 				xi = list(input_data.iloc[i])
@@ -422,6 +466,7 @@ def fast_non_dominated_sorting(
 	no_dominators = [len(i) for i in idx_dominators]
 	rnk_list = [[i for i, no in enumerate(no_dominators) if no == 0]]
 	sol_assigned = [len([i for i, no in enumerate(no_dominators) if no == 0])]
+
 	while sum(sol_assigned) < pop_size:
 		q = []
 		no_sol_in_curr_frnt = sol_assigned[-1]
@@ -445,12 +490,17 @@ def crowding_dist_4_frnt(
 		ranking,
 		range_):
 
+	#print("crowding_dist_4_frnt")
+
 	pop_size = len(population_)
 	obj_dim = len(range_)
 	var_no = len(population_[0]) - 1 - obj_dim
 	cd = []
 	for i in range(pop_size):
-		cd.append([np.inf]*obj_dim)
+		fill_list = []
+		for i in range(obj_dim):
+			fill_list.append(np.inf)
+		cd.append(fill_list + [])
 	for i in range(len(ranking)):
 		select_row = []
 		for row in population_:
@@ -477,6 +527,8 @@ def non_dom_sort(
 		population,
 		loaded_data):
 
+	#print("non_dom_sort")
+
 	objective_names = loaded_data["objective_names"]
 
 	#sort individuals by non domination
@@ -497,7 +549,7 @@ def non_dom_sort(
 	my_result = my_result.sort_values(by = 'individual', ignore_index = True)
 
 	# add the rank to the data frame
-	population = population.join(my_result["rank"])
+	population["rank"] = my_result["rank"]
 	
 	# calculate (MAX - MIN) of every objective function
 	range_ = []
@@ -526,6 +578,8 @@ def non_dom_sort(
 def tournament_selection(
 		tournament_size,
 		tournament_pop):
+
+	#print("tournament_selection")
 
 	# randomly choose as many individuals as the tournament size indicates
 	ids = []
@@ -568,11 +622,13 @@ def tournament_selection(
 def get_neighbors(
 		node_list,
 		multiplex):
+
+	#print("get_neighbors")
 	
 	neighbors = []
 
 	# loop through all the layer of the multiplex
-	for layer in range(len(multiplex)):
+	for layer in multiplex:
 		# add to the list the neighbors of the node list in the current layer
 		for node in node_list:
 			neighbors = neighbors + layer.vs[layer.neighbors(node)]["name"]
@@ -588,6 +644,8 @@ def get_parent2(
 		parent1,
 		population,
 		loaded_data):
+
+	#print("get_parent2")
 
 	multiplex = loaded_data["multiplex"]
 	pop_size = loaded_data["pop_size"]
@@ -639,6 +697,8 @@ def filter_multiplex(
 		multiplex,
 		nodes_to_keep):
 
+	#print("filter_multiplex")
+
 	# declare empty list to store the multiplex
 	filtered_multiplex = []
 
@@ -658,6 +718,8 @@ def make_bfs(
 		my_mx,
 		root,
 		size_of_individual):
+
+	#print("make_bfs")
 	
 	# initialization
 	discovered = []
@@ -731,6 +793,8 @@ def bfs_iterative_mx(
 		root,
 		size_of_individual,
 		loaded_data):
+
+	#print("bfs_iterative_mx")
 	
 	max_number_of_attempts = loaded_data["max_number_of_attemps"]
 	multiplex = loaded_data["multiplex"]
@@ -776,6 +840,8 @@ def crossover(
 		parent1,
 		parent2,
 		loaded_data):
+
+	#print("crossover")
 	
 	max_number_of_attempts = loaded_data["max_number_of_attemps"]
 	min_size = loaded_data["min_size"]
@@ -847,6 +913,8 @@ def get_node_to_add(
 		av_neighbors,
 		loaded_data):
 
+	#print("get_node_to_add")
+
 	deg = loaded_data["deg"]
 	multiplex = loaded_data["multiplex"]
 
@@ -887,15 +955,19 @@ def mutate_nodes(
 		nodes_to_mutate,
 		pot_nodes_to_mutate,
 		loaded_data):
+
+	#print("mutate_nodes")
 	
 	# get DEG
 	deg = loaded_data["deg"]
-	ind = []
+	ind = individual
 
 	# if at least one of the nodes will be mutated
 	# loop through the nodes to remove
 	for i in nodes_to_mutate:
-		mutated_network = ind_to_mut_net.delete_vertices(pot_nodes_to_mutate[i])
+		if pot_nodes_to_mutate[i] in ind_to_mut_net.vs["name"]:
+			ind_to_mut_net.delete_vertices(pot_nodes_to_mutate[i])
+		mutated_network = ind_to_mut_net
 
 		# obtain neighbors of nodes
 		neighbors_or_ind_ = []
@@ -946,6 +1018,8 @@ def add_node(
 		ind_to_mut_net,
 		loaded_data):
 
+	#print("add_node")
+
 	# get deg
 	deg = loaded_data["deg"]
 
@@ -978,12 +1052,16 @@ def mutation(
 		individuals,
 		multiplex,
 		loaded_data):
+
+	#print("mutation")
 	
 	merged = loaded_data["merged"]
 	deg = loaded_data["deg"]
 	mutation_rate = loaded_data["mutation_rate"]
 
-	mutants = [[]]*len(individuals)
+	mutants = []
+	for ind in range(len(individuals)):
+		mutants.append([])
 
 	# loop through all the individuals to be mutated
 	for i in range(len(individuals)):
@@ -993,10 +1071,10 @@ def mutation(
 		# check if mutation is to be performed
 		if p <= mutation_rate:
 			# make subnetwork
-			ind_to_mut_net = merged.induced_subgraph(individual[i])
+			ind_to_mut_net = merged.induced_subgraph(individuals[i])
 			# get nodes' degrees
 			ind_to_mut_nodes_ = ind_to_mut_net.vs["name"]
-			ind_to_mut_deg_ = ind_to_mut_net.degree(ind_to_mut_nodes)
+			ind_to_mut_deg_ = ind_to_mut_net.degree(ind_to_mut_nodes_)
 
 			# remove DEG from the list
 			ind_to_mut_nodes = []
@@ -1044,6 +1122,8 @@ def mutation(
 def get_duplicated_inds(
 		div_pop,
 		threshold):
+
+	#print("get_duplicated_inds")
 	
 	# create all the combinations of 2 numbers with the ids of individuals
 	index1 = []
@@ -1064,6 +1144,8 @@ def get_duplicated_inds(
 
 	# keep "duplicated" individuals
 	sim = sim[sim["js"] >= threshold]
+	
+	sim = sim.reset_index(drop = True)
 
 	return sim
 
@@ -1072,7 +1154,9 @@ def get_duplicated_inds(
 def replace_duplicated_inds(
 		combined_population,
 		loaded_data):
-	
+
+	#print("replace_duplicated_inds")
+
 	div_pop = combined_population
 	threshold = loaded_data["jaccard_similarity_threshold"]
 	multiplex = loaded_data["multiplex"]
@@ -1100,7 +1184,7 @@ def replace_duplicated_inds(
 			# tournament between the two individuals
 			else:
 				ind_to_keep = tournament_selection(2, sorted_pop.iloc[[ind1_id, ind2_id]])
-				if ind_to_keep == sorted_pop.iloc[[ind1_id]]:
+				if set(ind_to_keep) == set(sorted_pop.iloc[[ind1_id]]):
 					inds_to_remove.append(ind2_id)
 				else:
 					inds_to_remove.append(ind1_id)
@@ -1115,7 +1199,7 @@ def replace_duplicated_inds(
 
 				ref = []
 				for r in ref_:
-					if ref > i:
+					if r > i:
 						ref.append(r)
 
 				sim = sim.drop(ref)
@@ -1126,19 +1210,27 @@ def replace_duplicated_inds(
 		div_pop = sorted_pop.drop(inds_to_remove)
 
 	# generate as many new individuals as duplicated ones
-	new_inds = generate_initial_pop(combined_population.shape[0] - div_pop.shape[0], multiplex, loaded_data)
-	fitness_data = evaluate_population(new_inds, multiplex, loaded_data)
+	if combined_population.shape[0] - div_pop.shape[0] > 0:
+		new_inds = generate_initial_pop(combined_population.shape[0] - div_pop.shape[0], multiplex, loaded_data)
 
-	div_pop = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
+		fitness_data = evaluate_population(new_inds, multiplex, loaded_data)
 
-	for i in range(len(new_inds)):
-		div_pop.at[i, "individual"] = new_inds[i]
+		div_pop_ = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
 
-	div_pop = pd.concat([div_pop, fitness_data], axis = 1)
+		for i in range(len(new_inds)):
+			div_pop_.at[i, "individual"] = new_inds[i]
 
-	for i in range(len(new_inds)):
-		div_pop.at[i, "rank"] = 0
-		div_pop.at[i, "crowding_distance"] = 0
+		if fitness_data.shape[0] > 0:
+			div_pop_ = pd.concat([div_pop_, fitness_data], axis = 1)
+		else:
+			for i in range(len(new_inds)):
+				div_pop_.at[i, "fitness_data"] = 0
+
+		for i in range(len(new_inds)):
+			div_pop_.at[i, "rank"] = 0
+			div_pop_.at[i, "crowding_distance"] = 0
+
+		div_pop = pd.concat([div_pop, div_pop_], ignore_index = True)
 
 	div_pop = non_dom_sort(div_pop, loaded_data)
 
@@ -1150,11 +1242,13 @@ def replacement(
 		parents,
 		children,
 		loaded_data):
+
+	#print("replacement")
 	
 	pop_size = loaded_data["pop_size"]
 
 	# combine the new population (offspring) with old population (parents)
-	combined_population = pd.concat([parents, children])
+	combined_population = pd.concat([parents, children], ignore_index=True)
 
 	# replace duplicated individuals with random ones
 	combined_population = replace_duplicated_inds(combined_population, loaded_data)
@@ -1187,11 +1281,15 @@ def make_new_population(
 		loaded_data,
 		population):
 
+	#print("make_new_population")
+
 	pop_size = loaded_data["pop_size"]
 	max_number_of_attempts = loaded_data["max_number_of_attemps"]
 	tournament_size = loaded_data["tournament_size"]
 	multiplex = loaded_data["multiplex"]
-	my_new_population = [[]]*pop_size # initialize vector
+	my_new_population = [] # initialize vector
+	for pop in range(pop_size):
+		my_new_population.append([])
 
 	# loop to generate the new population. In each loop, 2 children are created
 	for i in range(0, pop_size, 2):
@@ -1225,7 +1323,10 @@ def make_new_population(
 		# add child 1 to the population
 		my_new_population[i] = children[0]
 		# add child 2 to the population
-		my_new_population[i+1] = children[1]
+		if i+1 < pop_size:
+			my_new_population[i+1] = children[1]
+		else:
+			my_new_population.append(children[1])
 
 	# evaluate offspring
 	fitness_data = evaluate_population(my_new_population, multiplex, loaded_data)
@@ -1254,6 +1355,8 @@ def save_final_pop(
 		population,
 		pop_size,
 		network):
+
+	#print("save_final_pop")
 	
 	# loop through the pop_size best individuals in the population
 	for i in range(pop_size):
@@ -1267,7 +1370,7 @@ def save_final_pop(
 
 		# save in files
 		fd = open(best_inds_file, "a")
-		fd.write(" ".join(decoded_ind) + "," + str(population.at[i, "average_nodes_score"]) + "," + str(population.at[i, "density"]) + "," + str(population.at[i, "rank"]) + "," + str(population.at[i, "crowding_distance"]) + "\n")
+		fd.write(" ".join(decoded_ind) + "," + str(population.at[i, "average_nodes_score"]) + "," + str(population.at[i, "density"]) + "," + str(population.at[i, "rank"]) + "," + str(population.at[i, "crowding_distance"]) + '\n')
 		fd.close()
 
 
@@ -1277,7 +1380,12 @@ def mogamun_body(
 		loaded_data,
 		best_inds_path):
 
+	#print("mogamun_body")
+
 	best_inds_file = best_inds_path + "_Run_" + str(run_number) + ".txt"
+	if os.path.exists(best_inds_file) and os.path.getsize(best_inds_file) > 0:
+		with open(best_inds_file,'w') as f:
+			pass
 	my_init_pop = generate_initial_pop(loaded_data["pop_size"], loaded_data["multiplex"], loaded_data)
 	fitness_data = evaluate_population(my_init_pop, loaded_data["multiplex"], loaded_data)
 	population = pd.DataFrame(data = {}, columns = ["individual"], dtype = object)
@@ -1304,7 +1412,7 @@ def mogamun_body(
 			break
 
 	# evolution's loop for g generations or until all inds have rank = 1
-	while g <= loaded_data["generations"] and not if_all_rank:
+	while g < loaded_data["generations"] and not if_all_rank:
 		population = make_new_population(loaded_data, population)
 
 		# add the best values for the two objective functions

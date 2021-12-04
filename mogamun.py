@@ -68,7 +68,7 @@ def mogamun_load_data(
 		deg = deg[abs(deg["logFC"]) > 1]
 
 	# read the file names of the networks for the current experiment, network_layers_dir needs to finish with '/'
-	files = glob.glob(network_layers_dir + "/[" + layers + "]_*")
+	files = glob.glob(os.path.join(network_layers_dir, "[" + layers + "]_*"))
 
 	if len(files) < len(layers):
 		print("Error! One or more networks are missing from " + network_layers_dir)
@@ -114,10 +114,10 @@ def mogamun_run(
 		results_dir = '.'):
 	
 	if loaded_data:
-		results_path = results_dir + "/Experiment_" + datetime.today().strftime('%Y-%m-%d') + '/'
+		results_path = os.path.join(results_dir, "Experiment_" + datetime.today().strftime('%Y-%m-%d'))
 		if not os.path.exists(results_path):
 			os.mkdir(results_path) # create result folder
-		best_inds_path = results_path + "MOGAMUN_Results_" # path for res
+		best_inds_path = os.path.join(results_path, "MOGAMUN_Results_") # path for res
 
 		# init with number of cores
 		pool = mp.Pool(cores)
