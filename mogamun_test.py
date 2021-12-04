@@ -34,7 +34,7 @@ def main():
 	print("DEG, nodes score, layers paths:", deg_path, nodes_scores_path, layers_path, '\n')
 
 
-	evolution_parameters = mogamun.mogamun_init(generations = 10, pop_size = 10, min_size = 10, max_size = 20, crossover_rate = 1, mutation_rate = 1, max_number_of_attemps = 1)
+	evolution_parameters = mogamun.mogamun_init(generations = 5, pop_size = 100, min_size = 15, max_size = 50, crossover_rate = 0.8, mutation_rate = 0.1, jaccard_similarity_threshold = 30, tournament_size = 2, measure = "FDR", threshold_deg = 0.05, max_number_of_attemps = 3)
 
 	print("Evolution parameters:", evolution_parameters, '\n')
 

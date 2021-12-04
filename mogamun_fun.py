@@ -675,7 +675,7 @@ def get_parent2(
 	for index, row in potential_inds_parent2.iterrows():
 		for index_, row_ in parent1.iterrows():
 			if row == row_:
-				potential_inds_parent2.drop([index])
+				potential_inds_parent2.drop([index]).reset_index(drop = True)
 				break
 
 	# if there are more than 2 inds
@@ -935,7 +935,7 @@ def get_node_to_add(
 	sorted_counts = incidences_.most_common()
 	av_neighbors = []
 	i = 0
-	while sorted_counts[i][1] == sorted_counts[0][1] and i < len(sorted_counts):
+	while i < len(sorted_counts) and sorted_counts[i][1] == sorted_counts[0][1] :
 		av_neighbors.append(sorted_counts[i][0])
 		i += 1
 
@@ -1007,7 +1007,8 @@ def mutate_nodes(
 			ind.append(new_node_id)
 			ind_to_mut_net = loaded_data["merged"].induced_subgraph(ind)
 		else:
-			print("Attempt to add a new neighbor FAILED. Rolling back mutation")
+			#print("Attempt to add a new neighbor FAILED. Rolling back mutation")
+			pass
 
 	return ind
 
@@ -1202,12 +1203,12 @@ def replace_duplicated_inds(
 					if r > i:
 						ref.append(r)
 
-				sim = sim.drop(ref)
+				sim = sim.drop(ref).reset_index(drop = True)
 
 			i += 1
 
 		# remove the corresponding individuals
-		div_pop = sorted_pop.drop(inds_to_remove)
+		div_pop = sorted_pop.drop(inds_to_remove).reset_index(drop = True)
 
 	# generate as many new individuals as duplicated ones
 	if combined_population.shape[0] - div_pop.shape[0] > 0:
@@ -1310,7 +1311,7 @@ def make_new_population(
 
 		# if unsuccessful search
 		if attempts == max_number_of_attempts:
-			print("Max. no. of attemps to find compatible parents")
+			#print("Max. no. of attemps to find compatible parents")
 
 			#generate two random individuals
 			children = generate_initial_pop(2, multiplex, loaded_data)
