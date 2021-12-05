@@ -64,6 +64,31 @@ def get_nodes_scores_of_list_of_genes(
 	return nodes_scores
 
 
+# Gets the sorted list of nodes
+def get_list_of_all_nodes_present_in_layers(
+		files):
+
+	#print("get_list_of_all_nodes_present_in_layers")
+
+	# declare empty variable to store the nodes
+	all_nodes = []
+
+	# loop through all the layers to get the corresponding subnetwork
+	for layer_file in files:
+		# load layer
+		layer = pd.read_csv(layer_file, sep = '\t')
+
+		all_nodes = all_nodes + list(set(pd.concat([layer.iloc[:,0], layer.iloc[:,1]], join = "outer")))
+
+	# remove duplicates and sort alphabetically
+	all_nodes = sorted(list(set(all_nodes)))
+
+	# cast to string
+	all_nodes = [str(i) for i in all_nodes]
+
+	return all_nodes
+
+
 # Generates the multiplex network
 def generate_multiplex_network(
 		files):
@@ -93,31 +118,6 @@ def generate_multiplex_network(
 		multiplex.append(current_network)
 
 	return multiplex
-
-
-# Gets the sorted list of nodes
-def get_list_of_all_nodes_present_in_layers(
-		files):
-
-	#print("get_list_of_all_nodes_present_in_layers")
-
-	# declare empty variable to store the nodes
-	all_nodes = []
-
-	# loop through all the layers to get the corresponding subnetwork
-	for layer_file in files:
-		# load layer
-		layer = pd.read_csv(layer_file, sep = '\t')
-
-		all_nodes = all_nodes + list(set(pd.concat([layer.iloc[:,0], layer.iloc[:,1]], join = "outer")))
-
-	# remove duplicates and sort alphabetically
-	all_nodes = sorted(list(set(all_nodes)))
-
-	# cast to string
-	all_nodes = [str(i) for i in all_nodes]
-
-	return all_nodes
 
 
 # Generates the merged network
